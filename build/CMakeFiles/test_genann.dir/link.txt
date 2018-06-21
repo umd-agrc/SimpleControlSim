@@ -1,0 +1,1 @@
+/usr/bin/cc      CMakeFiles/test_genann.dir/test_genann.c.o CMakeFiles/test_genann.dir/genann.c.o  -o test_genann -rdynamic -lm -lpthread -lgsl -lgslcblas 
