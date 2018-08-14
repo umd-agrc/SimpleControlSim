@@ -1,7 +1,3 @@
-#include <gsl/gsl_errno.h>
-#include <gsl/gsl_matrix.h>
-#include <gsl/gsl_vector.h>
-#include <gsl/gsl_odeiv2.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -15,7 +11,6 @@
 #include <sys/types.h>
 #include <deque>
 
-#include "genann.h"
 #include "dynamics.h"
 #include "diff.h"
 #include "data.h"

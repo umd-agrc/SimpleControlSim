@@ -1,14 +1,13 @@
 #include <math.h>
-#include <gsl/gsl_blas.h>
+//#include <gsl/gsl_blas.h>
 
 #include "dynamics.h"
 
 gsl_matrix *dyn;
 gsl_matrix *gains;
-gsl_vector *fb;
+std::vector<double> fb;
 
-//genann *feedbackNn;
-tiny_dnn::network<tiny_dnn::sequential> feedbackNet;
+PolicyFunction policy;
 
 int setupDynamics() {
   double X_u   =  -0.27996;
@@ -68,21 +67,25 @@ int setupDynamics() {
 // Dynamics model from G. Gremillion, S. Humbert paper "System Identification of
 // a Quadrotor Micro Air Vehicle"
 // Augmented to include position dynamics
-int dynamics (gsl_vector *dy, double t, const gsl_vector *y, const gsl_vector *u) {
+//
+int dynamics(std::vector<double> *dy, double t, const std::vector<double> *y,
+    const std::vector<double> *u) {
   (void) (t); // Avoid unused parameter warning
-  gsl_matrix_set(dyn, 0, 3, cos(gsl_vector_get(y,11)));
-  gsl_matrix_set(dyn, 0, 4, -sin(gsl_vector_get(y,11)));
-  gsl_matrix_set(dyn, 1, 3, sin(gsl_vector_get(y,11)));
-  gsl_matrix_set(dyn, 1, 4, cos(gsl_vector_get(y,11)));
+  gsl_matrix_set(dyn, 0, 3, cos(y->at(11)));
+  gsl_matrix_set(dyn, 0, 4, -sin(y->at(11)));
+  gsl_matrix_set(dyn, 1, 3, sin(y->at(11)));
+  gsl_matrix_set(dyn, 1, 4, cos(y->at(11)));
 
-  gsl_vector *yu = gsl_vector_alloc(y->size+u->size);
+  std::vector<double> yu = vector_stack(y,u);
+  dy->resize(y->size()); 
 
-  gsl_vector_vstack(yu,y,u);
-  gsl_blas_dgemv(CblasNoTrans,
-                 1.0, dyn, yu, 
-                 0.0, dy);
+  //TODO
+  cblas_dgemv(CblasRowMajor, CblasNoTrans,
+              dyn->size1, dyn->size2,
+              1.0, dyn->data, dyn->size2,
+              &(yu[0]), 1, 0.0,
+              &(dy->at(0)), 1);
 
-  gsl_vector_free(yu);
   return SIM_SUCCESS;
 }
 
@@ -91,19 +94,19 @@ int teardownDynamics() {
   return SIM_SUCCESS;
 }
 
-gsl_vector *feedback(gsl_vector *yd, gsl_vector *y) {
-  gsl_vector *e = gsl_vector_calloc(y->size);
-  gsl_vector_memcpy(e,yd);
-  gsl_vector_sub(e,y);
-  gsl_blas_dgemv(CblasNoTrans,
-                 1.0, gains, e, 
-                 0.0, fb);
+std::vector<double> *feedback(const std::vector<double> *yd,
+    const std::vector<double> *y) {
+  std::vector<double> e = vector_sub(yd,y);
+  cblas_dgemv(CblasRowMajor, CblasNoTrans,
+              gains->size1, gains->size2,
+              1.0, gains->data, gains->size2,
+              &(e[0]), 1, 0.0,
+              &(fb[0]), 1);
 
-  return fb;
+  return &fb;
 }
 
 int setupFeedback() {
-  fb = gsl_vector_calloc(NUM_INPUTS);
   gains = gsl_matrix_calloc(NUM_INPUTS,NUM_STATES);
 
   double K[NUM_INPUTS][NUM_STATES] = {
@@ -119,52 +122,88 @@ int setupFeedback() {
     }
   }
 
+  fb.resize(gains->size1); 
+
   return SIM_SUCCESS;
 }
 
 int teardownFeedback() {
-  gsl_vector_free(fb);
   gsl_matrix_free(gains);
   return SIM_SUCCESS;
 }
 
-gsl_vector *nnFeedback(gsl_vector *yd, gsl_vector *y) {
-  gsl_vector *nnIn = gsl_vector_calloc(yd->size+y->size);
-  gsl_vector_vstack(nnIn,yd,y);
+std::vector<double> *policyFeedback(const std::vector<double> *yd,
+    const std::vector<double> *y) {
+  std::vector<double> e = vector_sub(yd,y);
+  cblas_dgemv(CblasRowMajor, CblasNoTrans,
+              gains->size1, gains->size2,
+              1.0, gains->data, gains->size2,
+              &(e[0]), 1, 0.0,
+              &(fb[0]), 1);
 
-  //TODO Convert to tiny_dnn
-  //double const *uVec = genann_run(feedbackNn, nnIn->data);
-  for (int i=0; i < NUM_INPUTS; i++) {
-    gsl_vector_set(fb,i,*(uVec+i));
-  }
+  std::vector<double> nnIn = vector_stack(yd,y);
+  tiny_dnn::vec_t in = tiny_dnn::convertToVecT(nnIn);
 
-  return fb;
+  tiny_dnn::vec_t meanPolicy = policy.policyNet.predict(in);
+  policy.probabilityDistribution.set_mean(meanPolicy);
+  tiny_dnn::vec_t samplePolicy = policy.probabilityDistribution.sample();
+
+  std::vector<double> policyFb = convertToStdVec(samplePolicy);
+
+	fb = vector_add(&fb,&policyFb);
+
+  return &fb;
 }
 
-int setupNnFeedback(int dataShape[2]) {
-  fb = gsl_vector_calloc(NUM_INPUTS);
+int setupPolicyFeedback(int dataShape[2]) {
+  tiny_dnn::input_layer policyIn(tiny_dnn::shape3d(dataShape[0],1,1));
+  tiny_dnn::fully_connected_layer policyHidden1(dataShape[0],100),
+                                  policyHidden2(100,10),
+                                  policyOut(10,NUM_INPUTS);
+  tiny_dnn::tanh_layer policyAct1(100),
+                       policyAct2(10);
 
-  //TODO Convert to tiny_dnn
-  //feedbackNn = genann_init(dataShape[0], 2, 100, dataShape[1]);
-  //genann_randomize(feedbackNn);
+  // Connect activation layers
+  policyHidden1 << policyAct1;
+  policyHidden2 << policyAct2;
+
+  // Connect graph
+  policyIn << policyHidden1 << policyHidden2 << policyOut;
+
+  tiny_dnn::construct_graph(policy.policyNet, {&policyIn}, {&policyOut});
+  policy.oldPolicyNet = policy.policyNet;
+
+  tiny_dnn::input_layer valueIn(tiny_dnn::shape3d(dataShape[0]+dataShape[1],1,1));
+  tiny_dnn::fully_connected_layer valueHidden1(dataShape[0]+dataShape[1],100),
+                                  valueHidden2(100,10),
+                                  valueOut(10,1);
+  tiny_dnn::tanh_layer valueAct1(100),
+                       valueAct2(10);
+
+  // Connect activation layers
+  valueHidden1 << valueAct1;
+  valueHidden2 << valueAct2;
+
+  // Connect graph
+  valueIn << valueHidden1 << valueHidden2 << valueOut;
+
+  tiny_dnn::construct_graph(policy.valueNet, {&valueIn}, {&valueOut});
 
   return SIM_SUCCESS;
 }
 
-int setupNnFeedback(FILE *in) {
-  fb = gsl_vector_calloc(NUM_INPUTS);
-
-  //TODO Convert to tiny_dnn
-  //feedbackNn = genann_read(in);
+int setupPolicyFeedback(char *policyNetFile, char *valueNetFile) {
+  policy.policyNet.load(policyNetFile);
+  policy.valueNet.load(valueNetFile);
 
   return SIM_SUCCESS;
 }
 
-int teardownNnFeedback() {
-  gsl_vector_free(fb);
+int teardownPolicyFeedback() {
   return SIM_SUCCESS;
 }
 
-tiny_dnn::network<tiny_dnn::sequential> *getFeedbackNn() {
-  return &feedbackNet;
+PolicyFunction *getFeedbackPolicy() {
+  return &policy;
 }
+

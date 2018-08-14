@@ -30,8 +30,8 @@ int seekCharSequence(const char *s, const char *c, int *idx) {
 
 int load_data(const char *training_data,
               int *datalen,
-              double **input,
-              double **output,
+              std::vector<tiny_dnn::vec_t> *input,
+              std::vector<tiny_dnn::vec_t> *output,
               int *samples) {
   /* Load the training data-set. */
   FILE *in = fopen(training_data, "r");
@@ -80,35 +80,33 @@ int load_data(const char *training_data,
 
   printf("Loading %d data points from %s\n", *samples, training_data);
 
-  /* Allocate memory for input and output data. */
-  *input = (double*)malloc(sizeof(double) * (*samples) * numInputs);
-  *output = (double*)malloc(sizeof(double) * (*samples) * numOutputs);
-
   // Read in data
   char inputSubstr[1024], outputSubstr[1024];
   char *split;
   if (!feof(in) && fgets(line,1024,in)) {
     for (int i=0; i < (*samples) && fgets(line,1024,in); ++i) {
-      double *p = *input + i * numInputs;
-      double *o = *output + i * numOutputs;
+      tiny_dnn::vec_t p;
+      tiny_dnn::vec_t o;
       seekCharSequence(line,dataSetWrapperChars,dataSetIdx); 
       int inputStrlen = dataSetIdx[1]-dataSetIdx[0]-1;
       strncpy(inputSubstr,&(line[dataSetIdx[0]+1]),inputStrlen);
       inputSubstr[inputStrlen] = 0;
       split = strtok(inputSubstr, " ");
       for (int j = 0; j < numInputs; ++j) {
-        p[j] = atof(split);
+        p.push_back(atof(split));
         split = strtok(0, " ");
       }
+      input->push_back(p);
 
       int outputStrlen = dataSetIdx[3]-dataSetIdx[2]-1;
       strncpy(outputSubstr,&(line[dataSetIdx[2]+1]),outputStrlen);
       outputSubstr[outputStrlen] = 0;
       split = strtok(outputSubstr, " ");
       for (int j = 0; j < numOutputs; ++j) {
-        o[j] = atof(split);
+        o.push_back(atof(split));
         split = strtok(0, " ");
       }
+      output->push_back(o);
     }
   }
 
@@ -120,14 +118,31 @@ int load_data(const char *training_data,
   return SIM_SUCCESS;
 }
 
-int teardownData(double *input, double *output) {
-  free(input);
-  free(output);
-  
+int save_data(const char *training_data,
+              const char *header,
+              std::vector<tiny_dnn::vec_t> *input,
+              std::vector<tiny_dnn::vec_t> *output) {
+  FILE *logfile = fopen(training_data,"w");
+  fputs(header,logfile);
+
+  auto it_in = input->begin();
+  auto it_out = output->begin();
+  for (; it_in != input->end() && it_out != output->end(); it_in++, it_out++) {
+    fputs("[",logfile);
+    std::vector<double> v = convertToStdVec(*it_in);
+    logVector(logfile, &v," ", "a",false);
+    fputs("], [",logfile);
+    v = convertToStdVec(*it_out);
+    logVector(logfile, &v," ", "a",false);
+    fputs("]\n",logfile); 
+  }
+
+  fclose(logfile);
+
   return SIM_SUCCESS;
 }
 
-int logVector(FILE *logfile,gsl_vector *v, char *dlm, char *mode, bool endDlm) {
+int logVector(FILE *logfile, std::vector<double> *v, char *dlm, char *mode, bool endDlm) {
   char line[1024], finalChar[2];
   line[0]=0;finalChar[0]=0;
 
@@ -139,15 +154,16 @@ int logVector(FILE *logfile,gsl_vector *v, char *dlm, char *mode, bool endDlm) {
     return SIM_FAILURE;
   }
 
-  int len = snprintf(NULL,0,"%f",gsl_vector_get(v,0));
+  int len = snprintf(NULL,0,"%f",v->at(0));
   char *str = (char*)malloc(len+1);
-  for (unsigned int i=0; i < v->size; i++) {
-    double el = gsl_vector_get(v,i);
-    snprintf(str,len,"%f",el);
+  int i=0,sz = v->size();
+  for (auto it=v->begin(); it != v->end(); it++) {
+    snprintf(str,len,"%f",*it);
     strcat(line,str);
-    if (i < v->size - 1 || endDlm) {
+    if (i < sz - 1 || endDlm) {
       strcat(line,dlm);
     }
+    i++;
   }
   free(str);
 

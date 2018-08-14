@@ -1,3 +1,2 @@
-/home/eric/Programs/Snapdragon/nn_control/build/CMakeFiles/nn_control_tester.dir
-/home/eric/Programs/Snapdragon/nn_control/build/CMakeFiles/test_genann.dir
 /home/eric/Programs/Snapdragon/nn_control/build/CMakeFiles/nn_control_server.dir
+/home/eric/Programs/Snapdragon/nn_control/build/test/CMakeFiles/test_cppad.dir

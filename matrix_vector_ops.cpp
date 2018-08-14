@@ -1,71 +1,112 @@
 #include "matrix_vector_ops.h"
 
-int gsl_matrix_vstack(gsl_matrix *c, const gsl_matrix *a, const gsl_matrix *b) {
-  if (a->size2 != b->size2) {
-    SIM_ERROR("Columns must be equal to do vertical matrix stack: %zd != %zd",
-        a->size2, b->size2);
-    return SIM_FAILURE;  
+std::vector<double> vector_stack(const std::vector<double> *a, const std::vector<double> *b) {
+  std::vector<double> c;
+  for (auto it=a->begin(); it!=a->end(); it++) {
+    c.push_back(*it);
   }
 
-  for (unsigned int i=0; i < a->size1; i++) {
-   for (unsigned int j=0; j < a->size2; j++) {
-      gsl_matrix_set(c, i, j, gsl_matrix_get(a, i, j));
-    }
+  for (auto it=b->begin(); it != b->end(); it++) {
+    c.push_back(*it);
   }
-
-  for (unsigned int i=0; i < b->size1; i++) {
-    for (unsigned int j=0; j < b->size2; j++) {
-      gsl_matrix_set(c, i + a->size1, j + a->size2, gsl_matrix_get(b, i, j));
-    }
-  }
-
-  return SIM_SUCCESS;
+  return c;
 }
 
-// Use gsl_blas_dgemm() instead:
-//  gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, A, B, 0.0, C);
-int gsl_matrix_mul(gsl_matrix *c, const gsl_matrix *a, const gsl_matrix *b) {
-  for (unsigned int i=0; i < c->size1; i++) {
-    for (unsigned int j=0; j < c->size2; j++) {
-      gsl_matrix_set(c, i, j, gsl_matrix_rowcol_mul(a,b,i,j));
-    }
+std::vector<double> vector_sub(const std::vector<double> *a, const std::vector<double> *b) {
+  std::vector<double> c;
+  auto itb = b->begin();
+  auto ita = a->begin();
+  for (; ita != a->end() && itb != b->end(); ita++) {
+    c.push_back(*ita-*itb);
+    itb++;
   }
-  
-  return SIM_SUCCESS;
+  return c;
 }
 
-double gsl_matrix_rowcol_mul(const gsl_matrix *a, const gsl_matrix *b, int r, int c) {
-  double ret=0;
-  for (unsigned int i=0; i < a->size2; i++) {
-    ret += gsl_matrix_get(a, r, i)*gsl_matrix_get(b, i, c);
+
+std::vector<double> vector_add(const std::vector<double> *a, const std::vector<double> *b) {
+  std::vector<double> c;
+  auto itb = b->begin();
+  auto ita = a->begin();
+  for (; ita != a->end() && itb != b->end(); ita++) {
+    c.push_back(*ita+*itb);
+    itb++;
   }
-  
+  return c;
+}
+
+std::vector<double> vector_add(const std::vector<double> *a, double b) {
+  std::vector<double> c;
+  auto ita = a->begin();
+  for (; ita != a->end(); ita++) {
+    c.push_back(*ita+b);
+  }
+  return c;
+}
+
+std::vector<double> vector_scale(const std::vector<double> *a, double k) {
+  std::vector<double> ret;
+  for (auto it=a->begin(); it!=a->end(); it++) {
+    ret.push_back((*it)*k); 
+  }
+
   return ret;
 }
 
-int gsl_vector_vstack(gsl_vector *c, const gsl_vector *a, const gsl_vector *b) {
-  for (unsigned int i=0; i < a->size; i++) {
-      gsl_vector_set(c, i, gsl_vector_get(a, i));
+double vector_infnorm(const std::vector<double> *v) {
+  double absmax = 0,absCurr;
+  for (auto it=v->begin(); it != v->end(); it++) {
+    absCurr = fabs(*it);
+    if (absCurr > absmax) {
+      absmax = absCurr;
+    }
   }
-
-  for (unsigned int i=0; i < b->size; i++) {
-      gsl_vector_set(c, i + a->size, gsl_vector_get(b, i));
-  }
-
-  return SIM_SUCCESS;
+  return absmax;
 }
 
-double gsl_vector_infnorm(const gsl_vector *v){ 
-  double min,max;
-
-  gsl_vector_minmax(v,&min,&max);
-  return fabs(min) > fabs(max) ? fabs(min) : fabs(max);  
-}
-
-void gsl_vector_print(const gsl_vector *v,char *name) {
+void vector_print(const std::vector<double> *v, char *name) {
   printf("%s: ",name);
-  for (unsigned int i = 0; i < v->size; i++) {
-    printf("%g ", gsl_vector_get(v,i));
+  for (auto it=v->begin(); it!=v->end(); it++ ) {
+    printf("%g ", *it);
   }
   printf("\n");
 }
+
+std::vector<double> vector_reduce_sum(const std::vector<double> *a) {
+  std::vector<double> ret;
+  auto ita = a->begin();
+  ret.resize(1);
+  ret[0] = 0;
+  for (; ita != a->end(); ita++) {
+    ret[0] += *ita;
+  }
+  return ret;
+}
+
+std::vector<double> DataPoint_reduce_sum(const std::vector<DataPoint> *a) {
+  return std::vector<double>();
+}
+
+std::vector<double> DataPoint_mean_square(const std::vector<DataPoint> *a,
+                                          std::vector<double> *mean) {
+  return std::vector<double>();
+}
+
+std::vector<double> vector_create(double d,int size) {
+  std::vector<double> ret;
+  ret.resize(size);
+  return ret;
+}
+
+std::vector<double> vector_edivide(const std::vector<double> *a,
+                                   const std::vector<double> *b) {
+  std::vector<double> c;
+  auto itb = b->begin();
+  auto ita = a->begin();
+  for (; ita != a->end() && itb != b->end(); ita++) {
+    c.push_back(*ita / *itb);
+    itb++;
+  }
+  return c;
+}
+

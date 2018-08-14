@@ -14,6 +14,21 @@
 # EXTERNAL cache entries
 ########################
 
+//Path to a library.
+BLAS_atlas_LIBRARY:FILEPATH=/usr/lib/libatlas.so
+
+//Path to a library.
+BLAS_f77blas_LIBRARY:FILEPATH=/usr/lib/libf77blas.so
+
+//Path to a library.
+BLAS_goto2_LIBRARY:FILEPATH=BLAS_goto2_LIBRARY-NOTFOUND
+
+//Build tests
+BUILD_MAIN:BOOL=ON
+
+//Build tests
+BUILD_TESTS:BOOL=ON
+
 //Path to a program.
 CMAKE_AR:FILEPATH=/usr/bin/ar
 
@@ -21,11 +36,8 @@ CMAKE_AR:FILEPATH=/usr/bin/ar
 // CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel.
 CMAKE_BUILD_TYPE:STRING=
 
-//Enable/Disable color output during build.
-CMAKE_COLOR_MAKEFILE:BOOL=ON
-
 //CXX compiler
-CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++
+CMAKE_CXX_COMPILER:FILEPATH=/usr/local/bin/clang++
 
 //Flags used by the compiler during all build types.
 CMAKE_CXX_FLAGS:STRING=
@@ -44,7 +56,7 @@ CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG
 CMAKE_CXX_FLAGS_RELWITHDEBINFO:STRING=-O2 -g -DNDEBUG
 
 //C compiler
-CMAKE_C_COMPILER:FILEPATH=/usr/bin/cc
+CMAKE_C_COMPILER:FILEPATH=/usr/local/bin/clang
 
 //Flags used by the compiler during all build types.
 CMAKE_C_FLAGS:STRING=
@@ -86,8 +98,8 @@ CMAKE_INSTALL_PREFIX:PATH=/usr/local
 //Path to a program.
 CMAKE_LINKER:FILEPATH=/usr/bin/ld
 
-//Path to a program.
-CMAKE_MAKE_PROGRAM:FILEPATH=/usr/bin/make
+//Program used to build from build.ninja files.
+CMAKE_MAKE_PROGRAM:FILEPATH=/usr/bin/ninja
 
 //Flags used by the linker during the creation of modules.
 CMAKE_MODULE_LINKER_FLAGS:STRING=
@@ -165,6 +177,75 @@ CMAKE_STRIP:FILEPATH=/usr/bin/strip
 // Studio IDE projects all commands are done without /nologo.
 CMAKE_VERBOSE_MAKEFILE:BOOL=FALSE
 
+//The directory containing a CMake configuration file for GreenteaLibDNN.
+GreenteaLibDNN_DIR:PATH=GreenteaLibDNN_DIR-NOTFOUND
+
+//Path to a file.
+NNPACK_INCLUDE_DIR:PATH=/usr/local/include
+
+//Path to a library.
+NNPACK_LIB:FILEPATH=/usr/local/lib/libnnpack.a
+
+//Path to a file.
+OpenCL_INCLUDE_DIR:PATH=/usr/local/cuda-7.5/include
+
+//Path to a library.
+OpenCL_LIBRARY:FILEPATH=/usr/lib/x86_64-linux-gnu/libOpenCL.so
+
+//C++ compiler flags for OpenMP parallization
+OpenMP_CXX_FLAGS:STRING=-fopenmp
+
+//C compiler flags for OpenMP parallization
+OpenMP_C_FLAGS:STRING=-fopenmp
+
+//Path to a file.
+TBB_INCLUDE_DIRS:PATH=/usr/include
+
+//Path to a library.
+TBB_tbb_LIBRARY_DEBUG:FILEPATH=TBB_tbb_LIBRARY_DEBUG-NOTFOUND
+
+//Path to a library.
+TBB_tbb_LIBRARY_RELEASE:FILEPATH=/usr/lib/libtbb.so
+
+//Build tiny-dnn with AVX library support
+USE_AVX:BOOL=ON
+
+//Build tiny-dnn with AVX2 library support
+USE_AVX2:BOOL=OFF
+
+//Build tiny-dnn with CBLAS library support
+USE_CBLAS:BOOL=ON
+
+//Build tiny-dnn with double precision computations
+USE_DOUBLE:BOOL=OFF
+
+//Build tiny-dnn with gemmlowp support
+USE_GEMMLOWP:BOOL=OFF
+
+//Build tiny-dnn with Image API support
+USE_IMAGE_API:BOOL=ON
+
+//Build tiny-dnn with GreenteaLibDNN library support
+USE_LIBDNN:BOOL=OFF
+
+//Build tiny-dnn with NNPACK library support
+USE_NNPACK:BOOL=OFF
+
+//Build tiny-dnn with OMP library support
+USE_OMP:BOOL=OFF
+
+//Build tiny-dnn with OpenCL library support
+USE_OPENCL:BOOL=OFF
+
+//Build tiny-dnn with Serialization support
+USE_SERIALIZER:BOOL=ON
+
+//Build tiny-dnn with SSE library support
+USE_SSE:BOOL=ON
+
+//Build tiny-dnn with TBB library support
+USE_TBB:BOOL=OFF
+
 //Value Computed by CMake
 nn_control_BINARY_DIR:STATIC=/home/eric/Programs/Snapdragon/nn_control/build
 
@@ -176,6 +257,16 @@ nn_control_SOURCE_DIR:STATIC=/home/eric/Programs/Snapdragon/nn_control
 # INTERNAL cache entries
 ########################
 
+//ADVANCED property for variable: BLAS_atlas_LIBRARY
+BLAS_atlas_LIBRARY-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: BLAS_f77blas_LIBRARY
+BLAS_f77blas_LIBRARY-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: BLAS_f77blas_atlas_WORKS
+BLAS_f77blas_atlas_WORKS-ADVANCED:INTERNAL=1
+//Have function dgemm_
+BLAS_f77blas_atlas_WORKS:INTERNAL=1
+//ADVANCED property for variable: BLAS_goto2_LIBRARY
+BLAS_goto2_LIBRARY-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_AR
 CMAKE_AR-ADVANCED:INTERNAL=1
 //This is the directory where this CMakeCache.txt was created
@@ -186,8 +277,6 @@ CMAKE_CACHE_MAJOR_VERSION:INTERNAL=3
 CMAKE_CACHE_MINOR_VERSION:INTERNAL=4
 //Patch version of cmake used to create the current loaded cache
 CMAKE_CACHE_PATCH_VERSION:INTERNAL=3
-//ADVANCED property for variable: CMAKE_COLOR_MAKEFILE
-CMAKE_COLOR_MAKEFILE-ADVANCED:INTERNAL=1
 //Path to CMake executable.
 CMAKE_COMMAND:INTERNAL=/opt/cmake-3.4.3-Linux-x86_64/bin/cmake
 //Path to cpack program executable.
@@ -218,8 +307,6 @@ CMAKE_C_FLAGS_MINSIZEREL-ADVANCED:INTERNAL=1
 CMAKE_C_FLAGS_RELEASE-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_C_FLAGS_RELWITHDEBINFO
 CMAKE_C_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
-//Path to cache edit program executable.
-CMAKE_EDIT_COMMAND:INTERNAL=/opt/cmake-3.4.3-Linux-x86_64/bin/ccmake
 //Executable file format
 CMAKE_EXECUTABLE_FORMAT:INTERNAL=ELF
 //ADVANCED property for variable: CMAKE_EXE_LINKER_FLAGS
@@ -237,11 +324,19 @@ CMAKE_EXPORT_COMPILE_COMMANDS-ADVANCED:INTERNAL=1
 //Name of external makefile project generator.
 CMAKE_EXTRA_GENERATOR:INTERNAL=
 //Name of generator.
-CMAKE_GENERATOR:INTERNAL=Unix Makefiles
+CMAKE_GENERATOR:INTERNAL=Ninja
 //Name of generator platform.
 CMAKE_GENERATOR_PLATFORM:INTERNAL=
 //Name of generator toolset.
 CMAKE_GENERATOR_TOOLSET:INTERNAL=
+//Have symbol pthread_create
+CMAKE_HAVE_LIBC_CREATE:INTERNAL=
+//Have library pthreads
+CMAKE_HAVE_PTHREADS_CREATE:INTERNAL=
+//Have library pthread
+CMAKE_HAVE_PTHREAD_CREATE:INTERNAL=1
+//Have include pthread.h
+CMAKE_HAVE_PTHREAD_H:INTERNAL=1
 //Source directory with the top level CMakeLists.txt file for this
 // project
 CMAKE_HOME_DIRECTORY:INTERNAL=/home/eric/Programs/Snapdragon/nn_control
@@ -264,7 +359,7 @@ CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_NM
 CMAKE_NM-ADVANCED:INTERNAL=1
 //number of local generators
-CMAKE_NUMBER_OF_MAKEFILES:INTERNAL=1
+CMAKE_NUMBER_OF_MAKEFILES:INTERNAL=2
 //ADVANCED property for variable: CMAKE_OBJCOPY
 CMAKE_OBJCOPY-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_OBJDUMP
@@ -303,4 +398,36 @@ CMAKE_STRIP-ADVANCED:INTERNAL=1
 CMAKE_UNAME:INTERNAL=/bin/uname
 //ADVANCED property for variable: CMAKE_VERBOSE_MAKEFILE
 CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
+//Test COMPILER_HAS_AVX2_FLAG
+COMPILER_HAS_AVX2_FLAG:INTERNAL=1
+//Test COMPILER_HAS_AVX_FLAG
+COMPILER_HAS_AVX_FLAG:INTERNAL=1
+//Test COMPILER_HAS_SSE_FLAG
+COMPILER_HAS_SSE_FLAG:INTERNAL=1
+//Details about finding Threads
+FIND_PACKAGE_MESSAGE_DETAILS_Threads:INTERNAL=[TRUE][v()]
+//ADVANCED property for variable: NNPACK_INCLUDE_DIR
+NNPACK_INCLUDE_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: NNPACK_LIB
+NNPACK_LIB-ADVANCED:INTERNAL=1
+//Have symbol CL_VERSION_1_2
+OPENCL_VERSION_1_2:INTERNAL=1
+//Have symbol CL_VERSION_2_0
+OPENCL_VERSION_2_0:INTERNAL=
+//ADVANCED property for variable: OpenCL_INCLUDE_DIR
+OpenCL_INCLUDE_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: OpenCL_LIBRARY
+OpenCL_LIBRARY-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: OpenMP_CXX_FLAGS
+OpenMP_CXX_FLAGS-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: OpenMP_C_FLAGS
+OpenMP_C_FLAGS-ADVANCED:INTERNAL=1
+//Test OpenMP_FLAG_DETECTED
+OpenMP_FLAG_DETECTED:INTERNAL=1
+//ADVANCED property for variable: TBB_INCLUDE_DIRS
+TBB_INCLUDE_DIRS-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: TBB_tbb_LIBRARY_DEBUG
+TBB_tbb_LIBRARY_DEBUG-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: TBB_tbb_LIBRARY_RELEASE
+TBB_tbb_LIBRARY_RELEASE-ADVANCED:INTERNAL=1
 

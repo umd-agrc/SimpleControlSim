@@ -1,192 +1,150 @@
 #include "simulator.h"
 
-const char *training_data = "./data/lqrData.txt";
-//double *input, *output;
-std::vector<tiny_dnn::vec_t> input, output;
-int samples = 0;
-
 void *simulate(void *var) {
   std::deque<char*> *sendQueue = static_cast<std::deque<char*>*>(var);
-  char sendBuff[1025];
   bool shouldExit = false;
-  int numSteps = 4200;
-  double t[numSteps];
-  double stepSize;
-  t[0] = 0;
-
+  char sendBuff[1025];
   int dataShape[2];
-
-  /* Load the training data and saved nn from file. */
-  load_data(training_data,dataShape,&input,&output,&samples);
 
   // Initialize vehicle and controller
   VehicleState *vehicle = new VehicleState;
   Controller *controller = new Controller;
-  //setupSystem(vehicle,controller,dataShape); // to get new nn
-  // Load nn from file
-  //FILE *feedbackNnPrev = fopen("./nn/feedbackNn20Loops.txt","r");
-  setupSystem(vehicle,controller,feedbackNnPrev);
-  //fclose(feedbackNnPrev);
-  //genann *feedbackNn = getFeedbackNn();
+  //int sysType = NN_TYPE;
+  //int sysType = LQR_TYPE;
+  //TODO systype as command line argument
+  int sysType = POLICY_TYPE;
+  if (sysType == LQR_TYPE) {
+    setupSystem(vehicle,controller,dataShape,sysType);
 
-  /* Train the network with backpropagation. */
-  /*
-  FILE *feedbackNnFile = fopen("./nn/feedbackNn.txt","w");
-  int loops = 5;
-  printf("Training for %d loops over data.\n", loops);
-  for (int i = 0; i < loops; ++i) {
-    for (int j = 0; j < samples; ++j) {
-      genann_train(feedbackNn, input + j*dataShape[0], output + j*dataShape[1], .01);
+    char dataFilename[1024];
+    strcpy(dataFilename,"./data/lqrCtl");
+    strcat(dataFilename,".csv");
+    testFeedbackControl(&shouldExit,dataFilename,sendQueue,vehicle,controller,1000);
+
+    strcpy(sendBuff,SHUTDOWN_MESSAGE);
+    sendQueue->push_back(sendBuff);
+  } else if (sysType == POLICY_TYPE) {	
+    // Load training data if any is cached
+    char *trainingDataFile = "data/policy/train/policyTrainingData.txt";
+    if (fileExists(trainingDataFile)) {
+      //load_data(dqnTrainingDataFile,dataShape,&input,&output,&samples);
     }
-  }
-  genann_write(feedbackNn,feedbackNnFile);
-  */
 
-  gsl_vector *y_next = gsl_vector_calloc(NUM_STATES);
-  gsl_vector *rk_e_next = gsl_vector_calloc(NUM_STATES);
+    char *policyNetFile = "nn/policy/feedbackPolicyNet";
+    char *valueNetFile = "nn/policy/feedbackValueNet";
+    if (fileExists(policyNetFile) && fileExists(valueNetFile))
+      setupSystem(vehicle,controller,policyNetFile,valueNetFile,sysType);
+    else {
+      dataShape[0] = NUM_STATES*2; dataShape[1] = NUM_INPUTS;
+      setupSystem(vehicle,controller,dataShape,sysType);
+    }
+    
+		srand(time(NULL));
+    PolicyFunction *policy = getFeedbackPolicy();
+		testPolicyFeedbackControl(&shouldExit,policyNetFile,valueNetFile,trainingDataFile,
+      sendQueue,policy,vehicle,controller);
+    strcpy(sendBuff,SHUTDOWN_MESSAGE);
+    sendQueue->push_back(sendBuff);
+	}
 
-  FILE *dataFile = fopen("data/lqrNn20Loops.csv","w");
+  printf("test done!!\n");
 
-  logHeader(dataFile,"t,xd,yd,zd,ud,vd,wd,pd,qd,rd,phid,thetad,psid,x,y,z,u,v,w,p,q,r,phi,theta,psi,del_lat,del_lon,del_yaw,del_thrust\n");
-  logTime(dataFile,t[0],",","a");
-  logVector(dataFile,vehicle->yd,",","a",true);
-  logVector(dataFile,vehicle->y,",","a",true);
-  logVector(dataFile,controller->feedback(vehicle->yd,vehicle->y),",","n",false);
-  int i=1;
-  while (!shouldExit && i < numSteps) {
-    rungeKutteAdaptiveStep(&dynamics,
-                           t[i-1],
-                           y_next,
-                           rk_e_next,
-                           vehicle,
-                           controller,
-                           &stepSize,
-                           -1);
-
-    t[i] = t[i-1] + stepSize;
-
-    gsl_vector_memcpy(vehicle->y,y_next);
-
-    logTime(dataFile,t[i],",","a");
-    logVector(dataFile,vehicle->yd,",","a",true);
-    logVector(dataFile,vehicle->y,",","a",true);
-    logVector(dataFile,controller->feedback(vehicle->yd,vehicle->y),",","n",false);
-
-    if (formNextMsg(sendBuff) == SIM_SUCCESS)
-      sendQueue->push_back(sendBuff);
-    //usleep(15000);
-
-    i++;
-  }
-
-  printf("done!!\n");
-  fclose(dataFile);
-  //fclose(feedbackNnFile);
-
-  strcpy(sendBuff,SHUTDOWN_MESSAGE);
-  sendQueue->push_back(sendBuff);
-
-  teardownSystem(vehicle,controller);
+  teardownSystem(vehicle,controller,sysType);
   delete vehicle;
   delete controller;
 
   return (void *)0;
 }
 
-int formNextMsg(char *msg) {
-  static int i=0;
-  sprintf(msg,"%d\n",++i); 
+int resetSystem(VehicleState *vehicle, Controller *controller) {
+  // Set initial and desired state vector
+  //    x y z u v w p q r phi theta psi
+  for (auto it = vehicle->yd.begin(); it != vehicle->yd.end(); it++){
+    *it = 0; 
+  } 
+  for (auto it = vehicle->y.begin(); it != vehicle->y.end(); it++){
+    *it = 1; 
+  } 
   return SIM_SUCCESS;
 }
 
-int setupSystem(VehicleState *vehicle, Controller *controller, int dataShape[2]) {
-  vehicle->yd = gsl_vector_calloc(NUM_STATES);
-  vehicle->y = gsl_vector_calloc(NUM_STATES);
-
-  controller->feedback = &nnFeedback;
+int setupSystem(VehicleState *vehicle, Controller *controller, int dataShape[2], int type) {
+  printf("Setting up system\n");
 
   // Set initial and desired state vector
   //    x y z u v w p q r phi theta psi
-  gsl_vector_set(vehicle->yd, 0, 0);
-  gsl_vector_set(vehicle->yd, 1, 0);
-  gsl_vector_set(vehicle->yd, 2, 0);
-  gsl_vector_set(vehicle->yd, 3, 0);
-  gsl_vector_set(vehicle->yd, 4, 0);
-  gsl_vector_set(vehicle->yd, 5, 0);
-  gsl_vector_set(vehicle->yd, 6, 0);
-  gsl_vector_set(vehicle->yd, 7, 0);
-  gsl_vector_set(vehicle->yd, 8, 0);
-  gsl_vector_set(vehicle->yd, 9, 0);
-  gsl_vector_set(vehicle->yd, 10, 0);
-  gsl_vector_set(vehicle->yd, 11, 0);
-
-  gsl_vector_set(vehicle->y, 0, 1);
-  gsl_vector_set(vehicle->y, 1, 1);
-  gsl_vector_set(vehicle->y, 2, 1);
-  gsl_vector_set(vehicle->y, 3, 1);
-  gsl_vector_set(vehicle->y, 4, 1);
-  gsl_vector_set(vehicle->y, 5, 1);
-  gsl_vector_set(vehicle->y, 6, 1);
-  gsl_vector_set(vehicle->y, 7, 1);
-  gsl_vector_set(vehicle->y, 8, 1);
-  gsl_vector_set(vehicle->y, 9, 1);
-  gsl_vector_set(vehicle->y, 10, 1);
-  gsl_vector_set(vehicle->y, 11, 1);
+  vehicle->yd.resize(NUM_STATES);
+  vehicle->y.resize(NUM_STATES);
+  resetSystem(vehicle,controller);
 
   setupDynamics();
-  setupNnFeedback(dataShape);
+
+  if (type == LQR_TYPE) {
+    controller->feedback = feedback;
+    setupFeedback();
+  } else if (type == POLICY_TYPE) {
+    controller->feedback = policyFeedback;
+    setupPolicyFeedback(dataShape);
+  }
   
   return SIM_SUCCESS;
 }
 
-int setupSystem(VehicleState *vehicle, Controller *controller, FILE *in) {
-  vehicle->yd = gsl_vector_calloc(NUM_STATES);
-  vehicle->y = gsl_vector_calloc(NUM_STATES);
-
-  controller->feedback = &nnFeedback;
-
+int setupSystem(VehicleState *vehicle, Controller *controller,
+    char *policyNetFile, char *valueNetFile, int type) {
+  printf("Setting up system\n");
   // Set initial and desired state vector
   //    x y z u v w p q r phi theta psi
-  gsl_vector_set(vehicle->yd, 0, 0);
-  gsl_vector_set(vehicle->yd, 1, 0);
-  gsl_vector_set(vehicle->yd, 2, 0);
-  gsl_vector_set(vehicle->yd, 3, 0);
-  gsl_vector_set(vehicle->yd, 4, 0);
-  gsl_vector_set(vehicle->yd, 5, 0);
-  gsl_vector_set(vehicle->yd, 6, 0);
-  gsl_vector_set(vehicle->yd, 7, 0);
-  gsl_vector_set(vehicle->yd, 8, 0);
-  gsl_vector_set(vehicle->yd, 9, 0);
-  gsl_vector_set(vehicle->yd, 10, 0);
-  gsl_vector_set(vehicle->yd, 11, 0);
-
-  gsl_vector_set(vehicle->y, 0, 1);
-  gsl_vector_set(vehicle->y, 1, 1);
-  gsl_vector_set(vehicle->y, 2, 1);
-  gsl_vector_set(vehicle->y, 3, 1);
-  gsl_vector_set(vehicle->y, 4, 1);
-  gsl_vector_set(vehicle->y, 5, 1);
-  gsl_vector_set(vehicle->y, 6, 1);
-  gsl_vector_set(vehicle->y, 7, 1);
-  gsl_vector_set(vehicle->y, 8, 1);
-  gsl_vector_set(vehicle->y, 9, 1);
-  gsl_vector_set(vehicle->y, 10, 1);
-  gsl_vector_set(vehicle->y, 11, 1);
+  vehicle->yd.resize(NUM_STATES);
+  vehicle->y.resize(NUM_STATES);
+  resetSystem(vehicle,controller);
 
   setupDynamics();
-  setupNnFeedback(in);
+
+  if (type == LQR_TYPE) {
+    //FIXME return error or setup input from file
+    controller->feedback = feedback;
+    setupFeedback();
+  } else if (type == POLICY_TYPE) {
+    controller->feedback = policyFeedback;
+    setupPolicyFeedback(policyNetFile, valueNetFile);
+  }
   
   return SIM_SUCCESS;
 }
 
-int teardownSystem(VehicleState *vehicle, Controller *controller) {
-  gsl_vector_free(vehicle->yd);
-  gsl_vector_free(vehicle->y);
-
+int teardownSystem(VehicleState *vehicle, Controller *controller, int type) {
   teardownDynamics();
-  teardownNnFeedback();
 
-  //teardownData(input,output);
-  
+  if (type == LQR_TYPE) {
+    teardownFeedback();
+  } else if (type == POLICY_TYPE) {
+    teardownPolicyFeedback();
+	}
+
   return SIM_SUCCESS;
 }
+
+
+void testPolicyFeedbackControl(bool *shouldExit, char *policyNetFile,
+    char *valueNetFile, char *trainingDataFile,
+		std::deque<char*> *sendQueue, PolicyFunction *policy,
+    VehicleState *vehicle, Controller *controller) {
+  //char sendBuff[1025];
+	int totalEpochs = 5;
+
+  int epoch = 0;
+  while (!*shouldExit && epoch < totalEpochs) {
+    // Test controller
+    testFeedbackControl(shouldExit, NULL, sendQueue,
+      vehicle, controller, 1000);
+
+    // Update controller policy
+    policyUpdate(shouldExit, policyNetFile, valueNetFile,
+      trainingDataFile, sendQueue, policy, vehicle, controller);
+
+		epoch++;
+	}
+}
+
+

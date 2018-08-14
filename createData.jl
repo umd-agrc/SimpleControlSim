@@ -50,7 +50,7 @@ struct LQRDataDistributions
   psi
 end
 
-const NUM_DATAPOINTS = 100000
+const NUM_DATAPOINTS = 1000
 const MOTOR_MAX_PWM = 2000
 
 function bound(lowerLim,upperLim,value)

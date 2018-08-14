@@ -6,8 +6,8 @@
 //TODO rk runner to do adaptive step size stuff
 int rungeKutteStep(DynamicsFunction dyn,
                    double t,
-                   gsl_vector *y_next,
-                   gsl_vector *rk_e_next,
+                   std::vector<double> *y_next,
+                   std::vector<double> *rk_e_next,
                    const VehicleState *vehicle,
                    const Controller *controller,
                    double h) {
@@ -29,70 +29,63 @@ int rungeKutteStep(DynamicsFunction dyn,
             (double)49/176, (double)-5103/18656, 0, 0 },
           { (double)35/384, 0, (double)500/1113, (double)125/192,
             (double)-2187/6784, (double)11/84, 0 } };
-
-  gsl_vector *k[7];
-  for (int i=0; i < 7; i++) {
-    k[i] = gsl_vector_calloc(vehicle->y->size);
-  }
-  gsl_vector *y_tmp = gsl_vector_calloc(vehicle->y->size);
-  gsl_vector *k_tmp = gsl_vector_calloc(k[0]->size);
-
+  std::vector<std::vector<double>> k;
+  k.reserve(7);
+  std::vector<double> y_tmp,k_tmp,k_res,u_tmp;
   // Evaluate R-K `k` components ---------------------
   for (int i=0; i < 7; i++) {
-    gsl_vector_memcpy(y_tmp,vehicle->y);
+    y_tmp = vehicle->y;
     for (int j=0; j < i; j++) {
-      gsl_vector_memcpy(k_tmp,k[j]);
-      gsl_vector_scale(k_tmp,h*a[i][j]);
-      gsl_vector_add(y_tmp,k_tmp);
+      k_tmp = vector_scale(&k[j],h*a[i][j]);
+      y_tmp = vector_add(&y_tmp,&k_tmp);
     }
-    assert(dyn(k[i],t+c[i]*h, y_tmp, controller->feedback(vehicle->yd,y_tmp)) ==
+    u_tmp = *(controller->feedback(&vehicle->yd,&y_tmp));
+    assert(dyn(&k_res,t+c[i]*h, &y_tmp, &u_tmp) ==
            SIM_SUCCESS);
+    k.push_back(k_res);
   }
   // -------------------------------------------------
 
-  gsl_vector *y_check = gsl_vector_calloc(vehicle->y->size);
-
-  gsl_vector_memcpy(y_next,vehicle->y); 
-  gsl_vector_memcpy(y_check,vehicle->y); 
+  *y_next = vehicle->y;
+  std::vector<double> y_check(vehicle->y);
 
   for (int i=0; i < 7; i++) {
-    gsl_vector_memcpy(k_tmp,k[i]);
-    gsl_vector_scale(k_tmp,h*b[0][i]);
-    gsl_vector_add(y_next,k_tmp);
+    k_tmp = vector_scale(&k[i],h*b[0][i]);
+    *y_next = vector_add(y_next,&k_tmp);
 
-    gsl_vector_memcpy(k_tmp,k[i]);
-    gsl_vector_scale(k_tmp,h*b[1][i]);
-    gsl_vector_add(y_check,k_tmp);
+    k_tmp = vector_scale(&k[i],h*b[1][i]);
+    y_check = vector_add(&y_check,&k_tmp);
   }
-  gsl_vector_memcpy(rk_e_next,y_next); 
-  gsl_vector_sub(rk_e_next,y_check);
+  *rk_e_next = vector_sub(y_next,&y_check);
 
   return SIM_SUCCESS;
 }
 
 int rungeKutteAdaptiveStep(DynamicsFunction dyn,
                            double t,
-                           gsl_vector *y_next,
-                           gsl_vector *rk_e_next,
+                           std::vector<double> *y_next,
+                           std::vector<double> *rk_e_next,
                            const VehicleState *vehicle,
                            const Controller *controller,
                            double *stepSize,
-                           double tolerance) {
+                           double tolerance,
+                           bool reset) {
   // Save previous step size as default
   static double h = DEFAULT_DIFF_STEPSIZE;
   static double stepUpdatePercentage = 0.9;
 
+  if (reset) h = DEFAULT_DIFF_STEPSIZE;
   if (tolerance < 0) tolerance = DEFAULT_DIFF_ERROR_TOLERANCE;
 
   rungeKutteStep(dyn,t,y_next,rk_e_next,vehicle,controller,h);
-  double e = gsl_vector_infnorm(rk_e_next);
+  double e = vector_infnorm(rk_e_next);
   int i=0;
   while (e > tolerance && i < MAX_DIFF_CORRECTION_ATTEMPTS) {
     // Update step size if error is too large
     // h = gamma*h*(tau/e)^(1/p)
     h = (h*pow((tolerance/e),1/RUNGE_KUTTA_ORDER))*stepUpdatePercentage;
     rungeKutteStep(dyn,t,y_next,rk_e_next,vehicle,controller,h);
-    e = gsl_vector_infnorm(rk_e_next);
+    e = vector_infnorm(rk_e_next);
     i++;
   }
   if (e < tolerance) {

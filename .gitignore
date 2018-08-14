@@ -1,3 +1,6 @@
+**/build/
+nn/
+
 # Prerequisites
 *.d
 

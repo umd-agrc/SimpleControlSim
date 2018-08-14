@@ -1,1 +1,0 @@
-/usr/bin/cc      CMakeFiles/nn_control_test.dir/test.c.o CMakeFiles/nn_control_test.dir/genann.c.o  -o nn_control_test -rdynamic -lm -lpthread -lgsl -lgslcblas 

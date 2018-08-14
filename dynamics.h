@@ -1,13 +1,12 @@
 #pragma once
 
 #include <gsl/gsl_matrix.h>
-#include <gsl/gsl_vector.h>
+//#include <gsl/gsl_vector.h>
 
 #include <tiny_dnn/tiny_dnn.h>
 
 #include "defines.h"
 #include "matrix_vector_ops.h"
-#include "genann.h"
 
 #define NUM_STATES 12
 #define NUM_INPUTS 4
@@ -56,16 +55,19 @@
 //
 // Control vector:
 //    del_lat del_lon del_yaw del_thrust
-int dynamics(gsl_vector *dy, double t, const gsl_vector *y, const gsl_vector *u);
+int dynamics(std::vector<double> *dy, double t, const std::vector<double> *y,
+    const std::vector<double> *u);
 int setupDynamics();
 int teardownDynamics();
 
-gsl_vector *feedback(gsl_vector *yd, gsl_vector *y);
+std::vector<double> *feedback(const std::vector<double> *yd,
+    const std::vector<double> *y);
 int setupFeedback();
 int teardownFeedback();
 
-gsl_vector *nnFeedback(gsl_vector *yd, gsl_vector *y);
-int setupNnFeedback(int dataShape[2]);
-int setupNnFeedback(FILE *in);
-int teardownNnFeedback();
-genann *getFeedbackNn();
+std::vector<double> *policyFeedback(const std::vector<double> *yd,
+    const std::vector<double> *y);
+int setupPolicyFeedback(int dataShape[2]);
+int setupPolicyFeedback(char *policyNetFile, char *valueNetFile);
+int teardownPolicyFeedback();
+PolicyFunction * getFeedbackPolicy();
