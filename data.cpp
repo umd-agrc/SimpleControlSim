@@ -10,8 +10,7 @@ int seekChar(const char *s, int c) {
 int seekCharSequence(const char *s, const char *c, int *idx) {
   char *substr = (char *)s;
   char *currChar = (char *)c;
-
-  int substrIdx = 0;
+int substrIdx = 0;
   int currIdx = 0;
   while (substr != NULL && *currChar != 0) {
     substrIdx = seekChar(substr,*currChar); 
@@ -30,8 +29,8 @@ int seekCharSequence(const char *s, const char *c, int *idx) {
 
 int load_data(const char *training_data,
               int *datalen,
-              std::vector<tiny_dnn::vec_t> *input,
-              std::vector<tiny_dnn::vec_t> *output,
+              mxnet::cpp::NDArray *input,
+              mxnet::cpp::NDArray *output,
               int *samples) {
   /* Load the training data-set. */
   FILE *in = fopen(training_data, "r");
@@ -51,6 +50,7 @@ int load_data(const char *training_data,
   strcpy(dataSetWrapperChars,"[][]");
 
   // Determine size of input and output sets
+/*
   if (!feof(in) && fgets(line,1024,in)) {
     seekCharSequence(line,dataSetWrapperChars,dataSetIdx); 
     int currIdx = dataSetIdx[0];
@@ -112,6 +112,7 @@ int load_data(const char *training_data,
 
   *datalen = numInputs;
   *(datalen+1) = numOutputs;
+*/
 
   fclose(in);
 
@@ -120,8 +121,9 @@ int load_data(const char *training_data,
 
 int save_data(const char *training_data,
               const char *header,
-              std::vector<tiny_dnn::vec_t> *input,
-              std::vector<tiny_dnn::vec_t> *output) {
+              mxnet::cpp::NDArray *input,
+              mxnet::cpp::NDArray *output) {
+/*
   FILE *logfile = fopen(training_data,"w");
   fputs(header,logfile);
 
@@ -138,11 +140,12 @@ int save_data(const char *training_data,
   }
 
   fclose(logfile);
+*/
 
   return SIM_SUCCESS;
 }
 
-int logVector(FILE *logfile, std::vector<double> *v, char *dlm, char *mode, bool endDlm) {
+int logVector(FILE *logfile, std::vector<mx_float> *v, char *dlm, char *mode, bool endDlm) {
   char line[1024], finalChar[2];
   line[0]=0;finalChar[0]=0;
 

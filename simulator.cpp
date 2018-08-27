@@ -1,5 +1,7 @@
 #include "simulator.h"
 
+using namespace mxnet::cpp;
+
 void *simulate(void *var) {
   std::deque<char*> *sendQueue = static_cast<std::deque<char*>*>(var);
   bool shouldExit = false;
@@ -19,7 +21,8 @@ void *simulate(void *var) {
     char dataFilename[1024];
     strcpy(dataFilename,"./data/lqrCtl");
     strcat(dataFilename,".csv");
-    testFeedbackControl(&shouldExit,dataFilename,sendQueue,vehicle,controller,1000);
+    //TODO fix this
+    //testFeedbackControl(&shouldExit,dataFilename,sendQueue,vehicle,controller,1000);
 
     strcpy(sendBuff,SHUTDOWN_MESSAGE);
     sendQueue->push_back(sendBuff);
@@ -35,16 +38,19 @@ void *simulate(void *var) {
     if (fileExists(policyNetFile) && fileExists(valueNetFile))
       setupSystem(vehicle,controller,policyNetFile,valueNetFile,sysType);
     else {
-      dataShape[0] = NUM_STATES*2; dataShape[1] = NUM_INPUTS;
-      setupSystem(vehicle,controller,dataShape,sysType);
+      //dataShape[0] = NUM_STATES*2; dataShape[1] = NUM_INPUTS;
+      //setupSystem(vehicle,controller,dataShape,sysType);
     }
     
 		srand(time(NULL));
-    PolicyFunction *policy = getFeedbackPolicy();
+    PolicyFunction policy;
+    setupPolicyFeedback(controller, &policy);
 		testPolicyFeedbackControl(&shouldExit,policyNetFile,valueNetFile,trainingDataFile,
       sendQueue,policy,vehicle,controller);
     strcpy(sendBuff,SHUTDOWN_MESSAGE);
     sendQueue->push_back(sendBuff);
+    policy.teardown();
+    MXNotifyShutdown();
 	}
 
   printf("test done!!\n");
@@ -83,8 +89,8 @@ int setupSystem(VehicleState *vehicle, Controller *controller, int dataShape[2],
     controller->feedback = feedback;
     setupFeedback();
   } else if (type == POLICY_TYPE) {
-    controller->feedback = policyFeedback;
-    setupPolicyFeedback(dataShape);
+    //controller->feedback = policyFeedback;
+    //setupPolicyFeedback(dataShape);
   }
   
   return SIM_SUCCESS;
@@ -106,8 +112,9 @@ int setupSystem(VehicleState *vehicle, Controller *controller,
     controller->feedback = feedback;
     setupFeedback();
   } else if (type == POLICY_TYPE) {
-    controller->feedback = policyFeedback;
-    setupPolicyFeedback(policyNetFile, valueNetFile);
+    //controller->feedback = policyFeedback;
+    //TODO
+    //setupPolicyFeedback(policyNetFile, valueNetFile);
   }
   
   return SIM_SUCCESS;
@@ -119,32 +126,30 @@ int teardownSystem(VehicleState *vehicle, Controller *controller, int type) {
   if (type == LQR_TYPE) {
     teardownFeedback();
   } else if (type == POLICY_TYPE) {
-    teardownPolicyFeedback();
 	}
 
   return SIM_SUCCESS;
 }
 
-
 void testPolicyFeedbackControl(bool *shouldExit, char *policyNetFile,
     char *valueNetFile, char *trainingDataFile,
-		std::deque<char*> *sendQueue, PolicyFunction *policy,
+		std::deque<char*> *sendQueue, PolicyFunction &policy,
     VehicleState *vehicle, Controller *controller) {
-  //char sendBuff[1025];
 	int totalEpochs = 5;
+
+  setupLoss(policy);
 
   int epoch = 0;
   while (!*shouldExit && epoch < totalEpochs) {
-    // Test controller
-    testFeedbackControl(shouldExit, NULL, sendQueue,
-      vehicle, controller, 1000);
-
     // Update controller policy
-    policyUpdate(shouldExit, policyNetFile, valueNetFile,
-      trainingDataFile, sendQueue, policy, vehicle, controller);
+    policyUpdate(shouldExit, sendQueue, policy, vehicle, controller, 1000);
 
 		epoch++;
 	}
+
+  std::cout << "here!" << std::endl;
+
+  NDArray::WaitAll();
 }
 
 

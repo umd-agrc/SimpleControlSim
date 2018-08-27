@@ -3,11 +3,13 @@
 
 #include "dynamics.h"
 
+using namespace mxnet::cpp;
+
 gsl_matrix *dyn;
 gsl_matrix *gains;
-std::vector<double> fb;
+std::vector<mx_float> fb;
 
-PolicyFunction policy;
+PolicyFunction *policy;
 
 int setupDynamics() {
   double X_u   =  -0.27996;
@@ -68,23 +70,25 @@ int setupDynamics() {
 // a Quadrotor Micro Air Vehicle"
 // Augmented to include position dynamics
 //
-int dynamics(std::vector<double> *dy, double t, const std::vector<double> *y,
-    const std::vector<double> *u) {
+int dynamics(std::vector<mx_float> *dy, mx_float t, const std::vector<mx_float> *y,
+    const std::vector<mx_float> *u) {
   (void) (t); // Avoid unused parameter warning
   gsl_matrix_set(dyn, 0, 3, cos(y->at(11)));
   gsl_matrix_set(dyn, 0, 4, -sin(y->at(11)));
   gsl_matrix_set(dyn, 1, 3, sin(y->at(11)));
   gsl_matrix_set(dyn, 1, 4, cos(y->at(11)));
 
-  std::vector<double> yu = vector_stack(y,u);
+  std::vector<mx_float> yu = vector_stack(y,u);
   dy->resize(y->size()); 
 
-  //TODO
+  std::vector<double> tmpYu(yu.begin(),yu.end());
+  std::vector<double> tmpDy(dy->size());
   cblas_dgemv(CblasRowMajor, CblasNoTrans,
               dyn->size1, dyn->size2,
               1.0, dyn->data, dyn->size2,
-              &(yu[0]), 1, 0.0,
-              &(dy->at(0)), 1);
+              tmpYu.data(), 1, 0.0,
+              &(tmpDy[0]), 1);
+  *dy = std::vector<mx_float>(tmpDy.begin(),tmpDy.end());
 
   return SIM_SUCCESS;
 }
@@ -94,14 +98,19 @@ int teardownDynamics() {
   return SIM_SUCCESS;
 }
 
-std::vector<double> *feedback(const std::vector<double> *yd,
-    const std::vector<double> *y) {
-  std::vector<double> e = vector_sub(yd,y);
+std::vector<mx_float> *feedback(const std::vector<mx_float> *yd,
+    const std::vector<mx_float> *y,
+    std::vector<mx_float> *baseAction,
+    std::vector<mx_float> *meanAction) {
+  std::vector<mx_float> e = vector_sub(yd,y);
+  std::vector<double> tmpE(e.begin(),e.end());
+  std::vector<double> tmpFb(fb.size());
   cblas_dgemv(CblasRowMajor, CblasNoTrans,
               gains->size1, gains->size2,
               1.0, gains->data, gains->size2,
-              &(e[0]), 1, 0.0,
-              &(fb[0]), 1);
+              tmpE.data(), 1, 0.0,
+              &(tmpFb[0]), 1);
+  fb = std::vector<mx_float>(tmpFb.begin(),tmpFb.end());
 
   return &fb;
 }
@@ -132,78 +141,42 @@ int teardownFeedback() {
   return SIM_SUCCESS;
 }
 
-std::vector<double> *policyFeedback(const std::vector<double> *yd,
-    const std::vector<double> *y) {
-  std::vector<double> e = vector_sub(yd,y);
+std::vector<mx_float> *policyFeedback(const std::vector<mx_float> *yd,
+    const std::vector<mx_float> *y,
+    std::vector<mx_float> *baseAction,
+    std::vector<mx_float> *meanAction) {
+  std::vector<mx_float> e = vector_sub(yd,y);
+  std::vector<double> tmpE(e.begin(),e.end());
+  std::vector<double> tmpFb(fb.size());
   cblas_dgemv(CblasRowMajor, CblasNoTrans,
               gains->size1, gains->size2,
               1.0, gains->data, gains->size2,
-              &(e[0]), 1, 0.0,
-              &(fb[0]), 1);
+              tmpE.data(), 1, 0.0,
+              &(tmpFb[0]), 1);
 
-  std::vector<double> nnIn = vector_stack(yd,y);
-  tiny_dnn::vec_t in = tiny_dnn::convertToVecT(nnIn);
+  /*
+  fb = std::vector<mx_float>(tmpFb.begin(),tmpFb.end());
+  if (baseAction) *baseAction = fb;
 
-  tiny_dnn::vec_t meanPolicy = policy.policyNet.predict(in);
-  policy.probabilityDistribution.set_mean(meanPolicy);
-  tiny_dnn::vec_t samplePolicy = policy.probabilityDistribution.sample();
+  std::vector<mx_float> nnIn = vector_stack(yd,y);
+  
+  policy->policyArgs["policyx"] =
+    NDArray(nnIn, Shape(1,2*NUM_STATES), Context::cpu());
 
-  std::vector<double> policyFb = convertToStdVec(samplePolicy);
+  policy->policyExec->Forward(false);
+  
+  std::vector<mx_float> policyFb;
+  policy->sample().SyncCopyToCPU(&policyFb);
+  if (meanAction) *meanAction = policyFb;
 
 	fb = vector_add(&fb,&policyFb);
+  */
 
   return &fb;
 }
 
-int setupPolicyFeedback(int dataShape[2]) {
-  tiny_dnn::input_layer policyIn(tiny_dnn::shape3d(dataShape[0],1,1));
-  tiny_dnn::fully_connected_layer policyHidden1(dataShape[0],100),
-                                  policyHidden2(100,10),
-                                  policyOut(10,NUM_INPUTS);
-  tiny_dnn::tanh_layer policyAct1(100),
-                       policyAct2(10);
-
-  // Connect activation layers
-  policyHidden1 << policyAct1;
-  policyHidden2 << policyAct2;
-
-  // Connect graph
-  policyIn << policyHidden1 << policyHidden2 << policyOut;
-
-  tiny_dnn::construct_graph(policy.policyNet, {&policyIn}, {&policyOut});
-  policy.oldPolicyNet = policy.policyNet;
-
-  tiny_dnn::input_layer valueIn(tiny_dnn::shape3d(dataShape[0]+dataShape[1],1,1));
-  tiny_dnn::fully_connected_layer valueHidden1(dataShape[0]+dataShape[1],100),
-                                  valueHidden2(100,10),
-                                  valueOut(10,1);
-  tiny_dnn::tanh_layer valueAct1(100),
-                       valueAct2(10);
-
-  // Connect activation layers
-  valueHidden1 << valueAct1;
-  valueHidden2 << valueAct2;
-
-  // Connect graph
-  valueIn << valueHidden1 << valueHidden2 << valueOut;
-
-  tiny_dnn::construct_graph(policy.valueNet, {&valueIn}, {&valueOut});
-
+int setupPolicyFeedback(Controller *controller, PolicyFunction *policyFunction) {
+  policy = policyFunction;
+  controller->feedback = policyFeedback;
   return SIM_SUCCESS;
 }
-
-int setupPolicyFeedback(char *policyNetFile, char *valueNetFile) {
-  policy.policyNet.load(policyNetFile);
-  policy.valueNet.load(valueNetFile);
-
-  return SIM_SUCCESS;
-}
-
-int teardownPolicyFeedback() {
-  return SIM_SUCCESS;
-}
-
-PolicyFunction *getFeedbackPolicy() {
-  return &policy;
-}
-

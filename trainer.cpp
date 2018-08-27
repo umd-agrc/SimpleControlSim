@@ -9,6 +9,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <sys/types.h>
+#include <time.h>
 #include <deque>
 
 #include "dynamics.h"

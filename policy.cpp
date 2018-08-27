@@ -1,189 +1,108 @@
 #include "policy.h"
 
-double epsilon;
-double c1,c2;
-tiny_dnn::adam opt;
+using namespace mxnet::cpp;
 
-using namespace tiny_dnn;
+PolicyFunction::PolicyFunction() {
+  const int policyInputSize = 2*NUM_STATES;
+  const int policyOutputSize = NUM_INPUTS;
+  const int valueInputSize = 2*NUM_STATES+NUM_INPUTS;
+  const int valueOutputSize = 1;
 
-void policyUpdate(bool *shouldExit, char *policyNetFile, char *valueNetFile,
-    char *trainingDataFile, std::deque<char*> *sendQueue,
-    PolicyFunction *policy, VehicleState *vehicle, Controller *controller) {
-  int numActors = 1;
-  int totalEpochs = 1;
-  std::vector<tiny_dnn::vec_t> valueTrainingInput, valueTrainingOutput;
-  std::vector<DataPoint> v;
-  LossAndGradients lossAndGradients;
-  
-  opt.alpha = 0.01;
+	const std::vector<int> policyLayers{100,100,policyOutputSize};
+	const std::vector<int> valueLayers{100,100,valueOutputSize};
 
-  //TODO gather clipped loss and -mse+entropy_bonus for each sample
-  // Form training minibatch
-  for (int i=0; i < numActors; i++) {
-    std::vector<DataPoint> vTmp = actor(shouldExit,policyNetFile,valueNetFile,
-        trainingDataFile,sendQueue,policy,vehicle,controller);
-    v.insert(v.end(),vTmp.begin(),vTmp.end());
+  const int batchSize = 1;
+  const int maxEpoch = 1;
+
+  // Set up probability distributions
+  stdDefaultValue = 0.1;
+
+  policyNet = mlp("policy",policyLayers);
+  valueNet = mlp("value",valueLayers);
+
+  policyArgs["policyx"] = NDArray(Shape(batchSize, policyInputSize), Context::cpu(), true);
+  policyArgs["policyy"] = NDArray(Shape(batchSize, policyOutputSize), Context::cpu(), true);
+
+  valueArgs["valuex"] = NDArray(Shape(batchSize, valueInputSize), Context::cpu(), true);
+  valueArgs["valuey"] = NDArray(Shape(batchSize, valueOutputSize), Context::cpu(), true);
+
+  policyNet.InferArgsMap(Context::cpu(), &policyArgs, policyArgs);
+  valueNet.InferArgsMap(Context::cpu(), &valueArgs, valueArgs);
+
+  // Initialize all parameters with uniform distribution U(-0.01, 0.01)
+  auto initializer = Uniform(0.01);
+  for (auto& arg : policyArgs) {
+    // arg.first is parameter name, and arg.second is the value
+    initializer(arg.first, &arg.second);
   }
 
-  // Get objective values
-  getObjectiveValues(&v, policy);
-
-  lossAndGradients = getLossAndGradients(&v);
-
-  policy->policyNet.fit_loss(opt,
-                lossAndGradients.loss,
-                lossAndGradients.gradients,
-                1,[](){},[](){});
-
-  //TODO valueNet fitting
-  setValueTrainingData(v,valueTrainingInput,valueTrainingOutput);
-  size_t valueTrainingBatchSize = v.size()-1;
-  int valueNumEpoch = 10;
-  //policy->valueNet.fit<tiny_dnn::mse>(opt,
-  policy->valueNet.fit<tiny_dnn::absolute>(opt,
-      valueTrainingInput,
-      valueTrainingOutput,
-      valueTrainingBatchSize,
-      valueNumEpoch,
-      [](){},[](){});
-  
-  policy->oldPolicyNet = policy->policyNet;
-
-  if (valueNumEpoch == CAMILA_TYPE) {
-    printf("HOORAY BOIIIII!!!");
-  }
-}
-
-//FIXME
-tiny_dnn::vec_t advantageDelta(DataPoint *state, DataPoint *nextState,
-    PolicyFunction *policy, double horizonDecay) {
-  setReward(state);
-  setStateValue(state,policy);
-  setStateValue(nextState,policy);
-  return state->reward + horizonDecay*nextState->value - state->value;
-}
-
-tiny_dnn::vec_t advantage(int idx, int numSteps, std::vector<DataPoint> *run,
-    PolicyFunction *policy, double horizonDecay, double genAdvantageDecay) {
-  // FIXME what to do if only one step
-  if (numSteps == 1) return {0};
-
-  DataPoint d = run->at(idx);
-  DataPoint dNext;
-
-  //TODO initialize advantage values to zero
-  tiny_dnn::vec_t advantageValues(d.out.size());
-  for (int i=idx; i < numSteps-1; i++) {
-    DataPoint dNext = run->at(idx+1);
-    advantageValues = advantageDelta(&d,&dNext,policy,horizonDecay);
-    for (unsigned int j=0; j < advantageValues.size(); j++) {
-      advantageValues[j] *= pow(horizonDecay*genAdvantageDecay,i-idx);
-    }
-
-    d = dNext;
+  // Initialize all parameters with uniform distribution U(-0.01, 0.01)
+  for (auto& arg : valueArgs) {
+    // arg.first is parameter name, and arg.second is the value
+    initializer(arg.first, &arg.second);
   }
 
-  return advantageValues;
+  policyOpt = OptimizerRegistry::Find("adam");
+	policyOpt->SetParam("lr", 0.01);
+  valueOpt = OptimizerRegistry::Find("adam");
+	valueOpt->SetParam("lr", 0.01);
+
+  policyExec = policyNet.SimpleBind(Context::cpu(),policyArgs); 
+  valueExec = valueNet.SimpleBind(Context::cpu(),valueArgs); 
 }
 
-template <class Type>
-Type objective(const CppAD::vector<Type> &out,
-    const tiny_dnn::vec_t &advantageValues,
-    const tiny_dnn::vec_t &in,
-    const tiny_dnn::vec_t &value,
-    const tiny_dnn::vec_t &valueTarget,
-    PolicyFunction *policy,
-    double epsilon,
-    double entropyCoef) {
-  tiny_dnn::vec_t oldMeanPolicy = policy->oldPolicyNet.predict(in);
-  CppAD::vector<Type> oldLogp = policy->probabilityDistribution.logp(out);
-
-  tiny_dnn::vec_t meanPolicy = policy->policyNet.predict(in);
-  policy->probabilityDistribution.set_mean(meanPolicy);
-  CppAD::vector<Type> logp = policy->probabilityDistribution.logp(out);
-
-  CppAD::vector<Type> policyRatio = exp(logp - oldLogp);
-  CppAD::vector<Type> surr1 = emult(policyRatio,advantageValues);
-  CppAD::vector<Type> surr2 = emult(clip(policyRatio,1-epsilon,1+epsilon),advantageValues);
-  CppAD::vector<Type> policySurrogate = min(surr1,surr2);
-
-  Type ent = entropyCoef*policy->probabilityDistribution.meanEntropy<Type>();
-  
-  return reduce_mean(policySurrogate) + ent + mse(value,valueTarget);
+std::vector<NDArray> PolicyFunction::act(NDArray observations) {
+  std::vector<NDArray> ret;
+  //TODO bind observations to policyExec
+  policyExec->Forward(false);
+  ret.push_back(policyExec->outputs[0]);
+  //TODO bind observations + policy outputs to valueExec
+  valueExec->Forward(false);
+  ret.push_back(valueExec->outputs[0]);
+  return ret;
 }
 
-void getObjectiveValues(std::vector<DataPoint> *v,
-    PolicyFunction *policy) {
+void PolicyFunction::update(std::vector<NDArray> policyGradients,
+    std::vector<NDArray> valueGradients) {
 
-  size_t n=v->at(0).out.size();
-  size_t m=1;
+  // Keep copy of old policy
+  oldPolicyExec->arg_arrays = policyExec->arg_arrays;
 
-  for (size_t i = 0; i < v->size(); i++) {
-    CppAD::vector<CppAD::AD<double>> outputVar(n);
-    outputVar = convertToAdVec<CppAD::AD<double>>(v->at(i).out);
+  auto policyArgNames = policyNet.ListArguments();
+  for (size_t i = 0; i < policyArgNames.size(); ++i) {
+    if (policyArgNames[i] == "policyx" || policyArgNames[i] == "policyy") continue;
+    policyOpt->Update(i, policyExec->arg_arrays[i], policyGradients[i]);
+  }
 
-    CppAD::Independent(outputVar);
-
-    CppAD::vector<CppAD::AD<double>> objectiveVar(m);
-    objectiveVar[0] = objective(outputVar,
-        v->at(i).advantageValues, v->at(i).in,
-        v->at(i).value, v->at(i).valueTarget, policy);
-
-    CppAD::ADFun<double> surrogateVars(outputVar,objectiveVar);
-
-    v->at(i).objectiveValue = CppAD::Value(objectiveVar[0]);
-
-    tiny_dnn::vec_t x(n);
-    x = v->at(i).out;
-    v->at(i).gradientValues = surrogateVars.Jacobian(x);
+  auto valueArgNames = valueNet.ListArguments();
+  for (size_t i = 0; i < valueArgNames.size(); ++i) {
+    if (valueArgNames[i] == "valuex" || valueArgNames[i] == "valuey") continue;
+    valueOpt->Update(i, valueExec->arg_arrays[i], valueGradients[i]);
   }
 }
 
-LossAndGradients getLossAndGradients(std::vector<DataPoint> *v) {
-  LossAndGradients ret;
-
-  for (auto it=v->begin(); it != v->end(); it++) {
-    ret.loss = ret.loss + it->objectiveValue;
-    ret.gradients = ret.gradients + it->gradientValues;
-  }
-  ret.loss = ret.loss / v->size();
-  ret.gradients = ret.gradients / v->size();
+NDArray PolicyFunction::getRand(Shape shape) {
+  NDArray ret = NDArray(shape,Context::cpu(),true);
+  NDArray::SampleGaussian(0,1,&ret);
+  return ret;
 }
 
-void setStateValue(DataPoint *state, PolicyFunction *policy) {
-  //TODO how to compute this? Do we need the value network?
-  state->value = policy->valueNet.predict(vec_t_concat(state->out,state->in));
+NDArray PolicyFunction::getStd(Shape shape) {
+  NDArray ret = NDArray(shape,Context::cpu(),true);
+  ret = stdDefaultValue;
+  return ret;
 }
 
-//TODO
-void setReward(DataPoint *state) {
-  state->reward = 0; 
+//TODO need to evaluate mean
+//TODO sample option old or new
+NDArray PolicyFunction::sample() {
+  std::map<std::string,NDArray> policy_dict = policyExec->arg_dict();
+  return policy_dict["policyy"] + getStd(Shape(1,NUM_INPUTS));
 }
 
-std::vector<DataPoint> actor(bool *shouldExit, char *policyNetFile, char *valueNetFile,
-    char *trainingDataFile, std::deque<char*> *sendQueue,
-    PolicyFunction *policy, VehicleState *vehicle, Controller *controller) {
-  int numSteps = 1000;
-  
-  std::vector<DataPoint> v =
-    testFeedbackControl(shouldExit,NULL,sendQueue,vehicle,controller,numSteps);
-
-  //FIXME should go to full episode termination
-  for (int i=0; i < numSteps-1; i++) {
-    v[i].advantageValues = advantage(i, numSteps, &v, policy);
-    v[i].valueTarget = v[i].advantageValues + v[i].value;
-  }
-  return v;
-}
-
-void setValueTrainingData(const std::vector<DataPoint> &v,
-    std::vector<tiny_dnn::vec_t> &valueTrainingInput,
-    std::vector<tiny_dnn::vec_t> &valueTrainingOutput) {
-  size_t k = v.size();
-  valueTrainingInput.resize(k);
-  valueTrainingOutput.resize(k);
-  for (size_t i = 0; i < k; i++) {
-    valueTrainingInput[i] = vec_t_concat(v[i].out,v[i].in);
-    valueTrainingOutput[i] = v[i].valueTarget;
-  }
+void PolicyFunction::teardown() {
+  delete policyExec;
+  delete oldPolicyExec;
+  delete valueExec;
+  delete lossExec;
 }

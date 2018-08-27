@@ -1,15 +1,10 @@
 #pragma once
 
 #include <gsl/gsl_matrix.h>
-//#include <gsl/gsl_vector.h>
-
-#include <tiny_dnn/tiny_dnn.h>
 
 #include "defines.h"
 #include "matrix_vector_ops.h"
-
-#define NUM_STATES 12
-#define NUM_INPUTS 4
+#include "policy.h"
 
 // Dynamics model from G. Gremillion, S. Humbert paper "System Identification of
 // a Quadrotor Micro Air Vehicle" (equation 3 in paper)
@@ -55,19 +50,21 @@
 //
 // Control vector:
 //    del_lat del_lon del_yaw del_thrust
-int dynamics(std::vector<double> *dy, double t, const std::vector<double> *y,
-    const std::vector<double> *u);
+int dynamics(std::vector<mx_float> *dy,
+    mx_float t, const std::vector<mx_float> *y,
+    const std::vector<mx_float> *u);
 int setupDynamics();
 int teardownDynamics();
 
-std::vector<double> *feedback(const std::vector<double> *yd,
-    const std::vector<double> *y);
+std::vector<mx_float> *feedback(const std::vector<mx_float> *yd,
+    const std::vector<mx_float> *y,
+    std::vector<mx_float> *baseAction,
+    std::vector<mx_float> *meanAction);
 int setupFeedback();
 int teardownFeedback();
 
-std::vector<double> *policyFeedback(const std::vector<double> *yd,
-    const std::vector<double> *y);
-int setupPolicyFeedback(int dataShape[2]);
-int setupPolicyFeedback(char *policyNetFile, char *valueNetFile);
-int teardownPolicyFeedback();
+std::vector<mx_float> *policyFeedback(const std::vector<mx_float> *yd,
+    const std::vector<mx_float> *y,
+    std::vector<mx_float> *baseCtl);
+int setupPolicyFeedback(Controller *controller, PolicyFunction *policyFunction);
 PolicyFunction * getFeedbackPolicy();

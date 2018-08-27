@@ -1,65 +1,47 @@
-#pragma once
+#ifndef NN_CONTROL_POLICY_H_
+#define NN_CONTROL_POLICY_H_
 
-#include <math.h>
-#include <tiny_dnn/tiny_dnn.h>
-#include <CppAD/cppad/cppad.hpp>
+#include <vector>
 
 #include "defines.h"
-#include "dynamics.h"
-#include "diff.h"
-#include "runner.h"
+#include "utils.h"
+#include "probability_distributions.h"
 
-void policyUpdate(bool *shouldExit, char *policyNetFile, char *valueNetFile,
-    char *trainingDataFile, std::deque<char*> *sendQueue,
-    PolicyFunction *policy, VehicleState *vehicle, Controller *controller);
+class PolicyFunction {
+public:
+  mxnet::cpp::Symbol policyNet;
+  mxnet::cpp::Symbol valueNet;
+  mxnet::cpp::Symbol logstd;
+  mxnet::cpp::Symbol loss;
+  DiagGaussianPd probabilityDistribution;
+  mx_float stdDefaultValue;
 
-tiny_dnn::vec_t advantageDelta(DataPoint *state, DataPoint *nextState,
-    PolicyFunction *policy, double horizonDecay = 0.9);
+  mxnet::cpp::Optimizer *policyOpt;
+  mxnet::cpp::Optimizer *valueOpt;
 
-tiny_dnn::vec_t advantage(int idx, int numSteps, std::vector<DataPoint> *run,
-    PolicyFunction *policy, double horizonDecay = 0.9, double genAdvantageDecay = 1.0);
+  std::map<std::string, mxnet::cpp::NDArray> policyArgs;
+  std::map<std::string, mxnet::cpp::NDArray> oldPolicyArgs;
+  std::map<std::string, mxnet::cpp::NDArray> valueArgs;
+  std::map<std::string,mxnet::cpp::NDArray> trajSegment;
+  std::map<std::string,mxnet::cpp::NDArray> oldTrajSegment;;
+  mxnet::cpp::NDArray baseActions;
 
-template <class Type>
-Type objective(const CppAD::vector<Type> &out,
-    const tiny_dnn::vec_t &advantageValues,
-    const tiny_dnn::vec_t &in,
-    const tiny_dnn::vec_t &value,
-    const tiny_dnn::vec_t &valueTarget,
-    PolicyFunction *policy,
-    double epsilon = 0.2,
-    double entropyCoef = 0.1);
+  mxnet::cpp::Executor *policyExec;
+  mxnet::cpp::Executor *oldPolicyExec;
+  mxnet::cpp::Executor *valueExec;
+  mxnet::cpp::Executor *lossExec;
 
-void getObjectiveValues(std::vector<DataPoint> *v,
-    PolicyFunction *policy);
+  PolicyFunction();
 
-LossAndGradients getLossAndGradients(std::vector<DataPoint> *v);
+  std::vector<mxnet::cpp::NDArray> act(mxnet::cpp::NDArray observations);
+  void update(std::vector<mxnet::cpp::NDArray> policyGradients,
+    std::vector<mxnet::cpp::NDArray> valueGradients);
 
-void setStateValue(DataPoint *state, PolicyFunction *policy);
+  mxnet::cpp::NDArray getRand(mxnet::cpp::Shape shape);
+  mxnet::cpp::NDArray getStd(mxnet::cpp::Shape shape);
+  mxnet::cpp::NDArray sample();
 
-void setReward(DataPoint *state);
+  void teardown();
+};
 
-double clip(double v, double left, double right);
-
-std::vector<double> policyRatio(DataPoint *state);
-
-std::vector<double> stateValue(DataPoint *state);
-
-std::vector<double> policySurrogate(DataPoint *state);
-
-std::vector<double> valueLoss(DataPoint *state);
-
-std::vector<double> entropyBonus(DataPoint *state);
-
-std::vector<double> reward(DataPoint *state, DataPoint *nextState);
-
-std::vector<double> targetValue(DataPoint *state);
-
-std::vector<DataPoint> actor(bool *shouldExit, char *policyNetFile, char *valueNetFile,
-    char *trainingDataFile, std::deque<char*> *sendQueue,
-    PolicyFunction *policy, VehicleState *vehicle, Controller *controller);
-
-void setValueTrainingData(const std::vector<DataPoint> &v,
-    std::vector<tiny_dnn::vec_t> &valueTrainingInput,
-    std::vector<tiny_dnn::vec_t> &valueTrainingOutput);
-
-//TODO TDLambda + GAE
+#endif

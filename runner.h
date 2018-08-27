@@ -5,9 +5,9 @@
 #include "dynamics.h"
 #include "diff.h"
 
-std::vector<DataPoint> testFeedbackControl(bool *shouldExit,
-    char *dataFilename, std::deque<char*> *sendQueue,
-    VehicleState *vehicle, Controller *controller,
+void testFeedbackControl(bool *shouldExit,
+    char *dataFilename, PolicyFunction &policy,
+    std::deque<char*> *sendQueue, VehicleState *vehicle, Controller *controller,
     int numSteps);
 
 int formNextMsg(char *msg);

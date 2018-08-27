@@ -1,34 +1,32 @@
 #pragma once
 
 #include <cmath>
-#include <chrono>
-#include <random>
-#include <string.h>
+#include <cstring>
+#include <string>
 
 #include "defines.h"
-#include "matrix_vector_ops.h"
+#include "utils.h"
 
+//TODO overload equality operator so that pd can be redefined after update
 class DiagGaussianPd {
 public:
   int len_;
-  std::vector<double> mean_, logstd_, std_;
-  unsigned seed;
-  std::default_random_engine randomGenerator;
-  std::normal_distribution<double> sampleDistribution;
 
 public:
   DiagGaussianPd();
-
-  DiagGaussianPd(
-      int len, std::vector<double> *mean, std::vector<double> *logstd);
   
-  std::vector<double> neglogp(std::vector<DataPoint> *actionSet);
+  mxnet::cpp::NDArray neglogp(
+      std::map<std::string,mxnet::cpp::NDArray> &trajSegment);
 
-  std::vector<double> logp(std::vector<DataPoint> *actionSet);
+  mxnet::cpp::NDArray logp(
+      std::map<std::string,mxnet::cpp::NDArray> &trajSegment);
 
-  std::vector<double> entropy();
+  mxnet::cpp::NDArray kl(
+    std::map<std::string,mxnet::cpp::NDArray> &trajSegment,
+    std::map<std::string,mxnet::cpp::NDArray> &oldTrajSegment);
 
-  std::vector<double> sample();
+  mxnet::cpp::NDArray entropy(
+    std::map<std::string,mxnet::cpp::NDArray> &trajSegment);
 };
 
 

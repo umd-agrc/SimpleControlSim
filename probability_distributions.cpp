@@ -1,43 +1,37 @@
 #include "probability_distributions.h"
 
+using namespace mxnet::cpp;
+
 DiagGaussianPd::DiagGaussianPd() {
 }
-  
-DiagGaussianPd::DiagGaussianPd(
-    int len, std::vector<double> *mean, std::vector<double> *logstd) :
-    len_(len), mean_(*mean), logstd_(*logstd) {
-  seed = std::chrono::system_clock::now().time_since_epoch().count();
-  randomGenerator = std::default_random_engine(seed);
-  sampleDistribution = std::normal_distribution<double>(0.0,1.0);
-  //TODO std_
+
+NDArray DiagGaussianPd::neglogp(
+    std::map<std::string,NDArray> &trajSegment) {
+   //TODO make sure summing over correct axes
+   return sum(square((trajSegment["action"]-trajSegment["mean"])
+                         /trajSegment["std"]))*0.5
+          + 0.5*log(2*M_PI)*NUM_INPUTS
+          + sum(trajSegment["logstd"]);
 }
 
-std::vector<double> DiagGaussianPd::neglogp(std::vector<DataPoint> *actionSet) {
-  std::vector<double> ret = DataPoint_mean_square(actionSet,&mean_),
-                      tmp;
-  ret = vector_edivide(&ret,&std_);
-  ret = vector_scale(&ret,0.5);
-  tmp = vector_create(0.5*log(M_2_PI),ret.size());
-  ret = vector_add(&ret,&tmp);
-  return vector_add(&ret,&logstd_);
+NDArray DiagGaussianPd::logp(
+    std::map<std::string,NDArray> &trajSegment) {
+  return negative(neglogp(trajSegment));
 }
 
-std::vector<double> DiagGaussianPd::logp(std::vector<DataPoint> *actionSet) {
-  std::vector<double> ret = neglogp(actionSet);
-  return vector_scale(&ret,-1);
+NDArray DiagGaussianPd::kl(
+  std::map<std::string,NDArray> &trajSegment,
+  std::map<std::string,NDArray> &oldTrajSegment) {
+  return sum(oldTrajSegment["logstd"] -
+             trajSegment["logstd"]
+             + (square(trajSegment["std"])
+                + square(trajSegment["mean"] - oldTrajSegment["mean"]))
+             / (square(oldTrajSegment["std"])*2) - 0.5);
 }
 
-std::vector<double> DiagGaussianPd::entropy() {
-  std::vector<double> ret = vector_add(&logstd_,0.5*log(M_2_PI*M_E));
-  return vector_reduce_sum(&ret);
+NDArray DiagGaussianPd::entropy(
+    std::map<std::string,NDArray> &trajSegment) {
+  return sum(trajSegment["logstd"]+0.5*log(2*M_PI*M_E));
 }
 
-std::vector<double> DiagGaussianPd::sample() {
-  std::vector<double> ret;
-  for (int i=0; i < len_; i++) {
-    ret.push_back(sampleDistribution(randomGenerator));
-  }
-  return ret;
-}
 
-//TODO KL Divergence penalty

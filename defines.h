@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <string>
 
-#include <tiny_dnn/tiny_dnn.h>
+#include <mxnet-cpp/MxNetCpp.h>
 
 extern "C" {
 #include <cblas.h>
@@ -27,62 +27,63 @@ extern "C" {
 #define POLICY_TYPE 1
 #define CAMILA_TYPE 2
 
+#define NUM_STATES 12
+#define NUM_INPUTS 4
+
 struct VehicleState {
-  std::vector<double> yd;
-  std::vector<double> y;
-  //gsl_vector *yd;
-  //gsl_vector *y;
+  std::vector<mx_float> yd;
+  std::vector<mx_float> y;
 };
 
 struct Controller {
-  std::vector<double> *(*feedback) (const std::vector <double> *yd,
-                                    const std::vector<double> *y);
+  std::vector<mx_float> *(*feedback) (
+      const std::vector <mx_float> *yd,
+      const std::vector<mx_float> *y,
+      std::vector<mx_float> *baseAction,
+      std::vector<mx_float> *meanAction);
 };
 
 struct DataPoint {
-  tiny_dnn::vec_t inTarget;
-  tiny_dnn::vec_t in;
-  tiny_dnn::vec_t out;
-  tiny_dnn::vec_t advantageValues;
-  tiny_dnn::vec_t value;
-  tiny_dnn::vec_t valueTarget;
-  tiny_dnn::float_t reward;
-  tiny_dnn::float_t objectiveValue;
-  tiny_dnn::vec_t gradientValues;
+  mxnet::cpp::NDArray inTarget;
+  mxnet::cpp::NDArray in;
+  mxnet::cpp::NDArray out;
+  mxnet::cpp::NDArray advantageValues;
+  mxnet::cpp::NDArray value;
+  mxnet::cpp::NDArray valueTarget;
+  double reward;
+  double objectiveValue;
+  mxnet::cpp::NDArray gradientValues;
 
   DataPoint() {}
-  DataPoint(std::vector<double> inVec, std::vector<double> outVec) {
-    size_t k = inVec.size();
-    size_t l = outVec.size();
-
-    in.resize(k);
-    out.resize(l);
-
-    for (size_t i = 0; i < k; i++) {
-      in[i] = inVec[i];
-    }
-
-    for (size_t i = 0; i < l; i++) {
-      out[i] = outVec[i];
-    }
+  DataPoint(std::vector<mx_float> inVec, std::vector<mx_float> outVec) {
+    in = mxnet::cpp::NDArray(inVec,
+                             mxnet::cpp::Shape(inVec.size(), 1),
+                             mxnet::cpp::Context::cpu());
+    out = mxnet::cpp::NDArray(outVec,
+                              mxnet::cpp::Shape(outVec.size(), 1),
+                              mxnet::cpp::Context::cpu());
   }
-  DataPoint(tiny_dnn::vec_t inVec, tiny_dnn::vec_t outVec) : 
+  DataPoint(mxnet::cpp::NDArray inVec, mxnet::cpp::NDArray outVec) : 
   in(inVec), out(outVec) {}
-  DataPoint(tiny_dnn::vec_t inVec, tiny_dnn::vec_t outVec,
-      tiny_dnn::vec_t adv, tiny_dnn::float_t obj) :
-    in(inVec), out(outVec), advantageValues(adv), objectiveValue(obj) {}
+  DataPoint(mxnet::cpp::NDArray inVec, mxnet::cpp::NDArray outVec,
+      mxnet::cpp::NDArray adv, mxnet::cpp::NDArray obj) :
+    in(inVec), out(outVec), advantageValues(adv) {
+    objectiveValue = obj.At(0,0);  
+  }
 };
 
+/*
 struct PolicyFunction {
-  tiny_dnn::network<tiny_dnn::graph> policyNet;
-  tiny_dnn::network<tiny_dnn::graph> oldPolicyNet;
-  tiny_dnn::network<tiny_dnn::graph> valueNet;
-  tiny_dnn::diag_gaussian_distribution probabilityDistribution;
+  mxnet::cpp::Symbol policyNet;
+  mxnet::cpp::Symbol oldPolicyNet;
+  mxnet::cpp::Symbol valueNet;
+  DiagGaussianDistribution probabilityDistribution;
 };
+*/
 
 struct LossAndGradients {
-  tiny_dnn::float_t loss;
-  tiny_dnn::vec_t gradients;
+  double loss;
+  mxnet::cpp::NDArray gradients;
 };
 
 // Check if file exists

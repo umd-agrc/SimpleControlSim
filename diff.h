@@ -15,36 +15,29 @@
 
 #define RUNGE_KUTTA_ORDER 5
 
-/*
-typedef int (*DynamicsFunction) (gsl_vector *dy,
-                                 double t,
-                                 const gsl_vector *y,
-                                 const gsl_vector *u);
-                                 */
-
-typedef int (*DynamicsFunction) (std::vector<double> *dy,
-                                 double t,
-                                 const std::vector<double> *y,
-                                 const std::vector<double> *u);
+typedef int (*DynamicsFunction) (std::vector<mx_float> *dy,
+                                 mx_float t,
+                                 const std::vector<mx_float> *y,
+                                 const std::vector<mx_float> *u);
 
 // Runge-Kutte-Dormand-Prince embedded method modified for controlled systems
 //TODO implement adaptive step size
 int rungeKutteStep(DynamicsFunction dyn,
-                   double t,
-                   std::vector<double> *y_next,
-                   std::vector<double> *rk_e_next,
+                   mx_float t,
+                   std::vector<mx_float> *y_next,
+                   std::vector<mx_float> *rk_e_next,
                    const VehicleState *vehicle,
                    const Controller *controller,
-                   double h);
+                   mx_float h);
 
 int rungeKutteAdaptiveStep(DynamicsFunction dyn,
-                           double t,
-                           std::vector<double> *y_next,
-                           std::vector<double> *rk_e_next,
+                           mx_float t,
+                           std::vector<mx_float> *y_next,
+                           std::vector<mx_float> *rk_e_next,
                            const VehicleState *vehicle,
                            const Controller *controller,
-                           double *stepSize,
-                           double tolerance,
+                           mx_float *stepSize,
+                           mx_float tolerance,
                            bool reset);
 
 //TODO implement implicit RK method as well for stiff equations
