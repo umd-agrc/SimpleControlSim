@@ -2,12 +2,12 @@
 
 #include <stdio.h>
 #include <stdbool.h>
-//#include <gsl/gsl_matrix.h>
-//#include <gsl/gsl_vector.h>
 #include <vector>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <string>
+#include <iostream>
+#include <utility>
 
 #include <mxnet-cpp/MxNetCpp.h>
 
@@ -16,10 +16,10 @@ extern "C" {
 }
 
 #define SIM_SUCCESS 0
-#define SIM_FAILURE -1
+#define SIM_FAIL -1
 
-#define SIM_INFO(...) do {fprintf(stdout,##__VA_ARGS__);} while(0)
-#define SIM_ERROR(...) do {fprintf(stdout,##__VA_ARGS__);} while(0)
+#define TEST_SUCCESS 0
+#define TEST_FAIL -1
 
 #define SHUTDOWN_MESSAGE "shutdown\n"
 
@@ -31,16 +31,15 @@ extern "C" {
 #define NUM_INPUTS 4
 
 struct VehicleState {
-  std::vector<mx_float> yd;
-  std::vector<mx_float> y;
+  mxnet::cpp::NDArray yd,y;
 };
 
 struct Controller {
-  std::vector<mx_float> *(*feedback) (
-      const std::vector <mx_float> *yd,
-      const std::vector<mx_float> *y,
-      std::vector<mx_float> *baseAction,
-      std::vector<mx_float> *meanAction);
+  mxnet::cpp::NDArray *(*feedback) (
+      mxnet::cpp::NDArray &yd,
+      mxnet::cpp::NDArray &y,
+      mxnet::cpp::NDArray *baseAction,
+      mxnet::cpp::NDArray *meanAction);
 };
 
 struct DataPoint {
@@ -90,4 +89,12 @@ struct LossAndGradients {
 inline bool fileExists(const std::string& name) {
   struct stat buffer;
   return (stat (name.c_str(), &buffer) == 0);
+}
+
+inline void log(){std::cout << std::endl;}
+
+template<typename First, typename ...Rest>
+inline void log(First &&first, Rest && ...rest) {
+  std::cout << std::forward<First> (first);
+  log(std::forward<Rest>(rest)...);
 }

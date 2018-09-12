@@ -3,6 +3,7 @@
 using namespace mxnet::cpp;
 
 PolicyFunction::PolicyFunction() {
+  log("Constructing policy function");
   const int policyInputSize = 2*NUM_STATES;
   const int policyOutputSize = NUM_INPUTS;
   const int valueInputSize = 2*NUM_STATES+NUM_INPUTS;
@@ -33,12 +34,14 @@ PolicyFunction::PolicyFunction() {
   auto initializer = Uniform(0.01);
   for (auto& arg : policyArgs) {
     // arg.first is parameter name, and arg.second is the value
+    if (arg.first == "policyx" || arg.first == "policyy") continue;
     initializer(arg.first, &arg.second);
   }
 
   // Initialize all parameters with uniform distribution U(-0.01, 0.01)
   for (auto& arg : valueArgs) {
     // arg.first is parameter name, and arg.second is the value
+    if (arg.first == "valuex" || arg.first == "valuey") continue;
     initializer(arg.first, &arg.second);
   }
 
@@ -49,8 +52,15 @@ PolicyFunction::PolicyFunction() {
 
   policyExec = policyNet.SimpleBind(Context::cpu(),policyArgs); 
   valueExec = valueNet.SimpleBind(Context::cpu(),valueArgs); 
+
 }
 
+PolicyFunction::~PolicyFunction() {
+  log("Deconstructing policy function");
+  teardown();
+}
+
+/*
 std::vector<NDArray> PolicyFunction::act(NDArray observations) {
   std::vector<NDArray> ret;
   //TODO bind observations to policyExec
@@ -61,6 +71,7 @@ std::vector<NDArray> PolicyFunction::act(NDArray observations) {
   ret.push_back(valueExec->outputs[0]);
   return ret;
 }
+*/
 
 void PolicyFunction::update(std::vector<NDArray> policyGradients,
     std::vector<NDArray> valueGradients) {
@@ -93,16 +104,69 @@ NDArray PolicyFunction::getStd(Shape shape) {
   return ret;
 }
 
-//TODO need to evaluate mean
-//TODO sample option old or new
 NDArray PolicyFunction::sample() {
   std::map<std::string,NDArray> policy_dict = policyExec->arg_dict();
   return policy_dict["policyy"] + getStd(Shape(1,NUM_INPUTS));
 }
 
+void PolicyFunction::rebindPolicy() {
+  policyNet.InferArgsMap(Context::cpu(),&policyArgs,policyArgs);
+  policyExec = policyNet.SimpleBind(Context::cpu(),policyArgs);
+}
+
+void PolicyFunction::rebindOldPolicy() {
+  oldPolicyBound = true;
+  policyNet.InferArgsMap(Context::cpu(),&oldPolicyArgs,oldPolicyArgs);
+  oldPolicyExec = policyNet.SimpleBind(Context::cpu(),oldPolicyArgs);
+}
+
+void PolicyFunction::rebindValue() {
+  valueNet.InferArgsMap(Context::cpu(),&valueArgs,valueArgs);
+  valueExec = valueNet.SimpleBind(Context::cpu(),valueArgs);
+}
+
+void PolicyFunction::rebindLoss() {
+  lossBound = true;
+  lossExec = loss.SimpleBind(Context::cpu(),trajSegment);
+}
+
+void PolicyFunction::saveArr(std::string filenamePrefix,std::string filenameSuffix) {
+  NDArray::Save(filenamePrefix+policyArgsString+filenameSuffix,policyArgs);
+  NDArray::Save(filenamePrefix+oldPolicyArgsString+filenameSuffix,oldPolicyArgs);
+  NDArray::Save(filenamePrefix+valueArgsString+filenameSuffix,valueArgs);
+  NDArray::Save(filenamePrefix+trajSegmentString+filenameSuffix,trajSegment);
+  NDArray::Save(filenamePrefix+oldTrajSegmentString+filenameSuffix,oldTrajSegment);
+}
+
+void PolicyFunction::loadArr(std::string filenamePrefix,std::string filenameSuffix) {
+  NDArray::Load(filenamePrefix+policyArgsString+filenameSuffix,nullptr,&policyArgs);
+  NDArray::Load(filenamePrefix+oldPolicyArgsString+filenameSuffix,nullptr,&oldPolicyArgs);
+  NDArray::Load(filenamePrefix+valueArgsString+filenameSuffix,nullptr,&valueArgs);
+  NDArray::Load(filenamePrefix+trajSegmentString+filenameSuffix,nullptr,&trajSegment);
+  NDArray::Load(filenamePrefix+oldTrajSegmentString+filenameSuffix,nullptr,&oldTrajSegment);
+}
+
+void PolicyFunction::saveSym(std::string filenamePrefix,std::string filenameSuffix) {
+  policyNet.Save(filenamePrefix+policyNetString+filenameSuffix);
+  valueNet.Save(filenamePrefix+valueNetString+filenameSuffix);
+  loss.Save(filenamePrefix+lossString+filenameSuffix);
+}
+
+void PolicyFunction::loadSym(std::string filenamePrefix,std::string filenameSuffix) {
+  policyNet = Symbol::Load(filenamePrefix+policyNetString+filenameSuffix);
+  valueNet = Symbol::Load(filenamePrefix+valueNetString+filenameSuffix);
+  loss = Symbol::Load(filenamePrefix+lossString+filenameSuffix);
+}
+
 void PolicyFunction::teardown() {
   delete policyExec;
-  delete oldPolicyExec;
+  if (oldPolicyBound) {
+    delete oldPolicyExec;
+    oldPolicyBound = false;
+  }
   delete valueExec;
-  delete lossExec;
+  if (lossBound) {
+    delete lossExec;
+    lossBound = false;
+  }
 }

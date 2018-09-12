@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
   char sendBuff[1025];
 
   listenfd = socket(AF_INET,SOCK_STREAM,0);
-  SIM_INFO("Socket retrieve success\n");  
+  log("Socket retrieve success");  
 
   memset(&serv_addr, '0', sizeof(serv_addr));
   memset(sendBuff, '0', sizeof(sendBuff));
@@ -46,8 +46,8 @@ int main(int argc, char *argv[]) {
   bind(listenfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
 
   if (listen(listenfd, 10) == -1) {
-    SIM_ERROR("Failed to listen");
-    return SIM_FAILURE;
+    log("Failed to listen");
+    return SIM_FAIL;
   }
 
   bool shouldExit = false;

@@ -9,11 +9,20 @@ set(GCC_COVERAGE_COMPILE_FLAGS
 )
 set(GCC_COVERAGE_LINK_FLAGS "")
 
+if (BUILD_DEBUG)
+  set(GCC_COVERAGE_COMPILE_FLAGS 
+    "${GCC_COVERAGE_COMPILE_FLAGS} -DDEBUG"
+  )
+else()
+  message("${GCC_COVERAGE_COMPILE_FLAGS}")
+endif()
+
 set(HEADER_FILES
   $ENV{MY_INCLUDES_PATH}
 )
 
 option(BUILD_TESTS "Build tests" ON)
+option(BUILD_TOOLS "Build tools" ON)
 option(BUILD_MAIN "Build main" ON)
 
 set (LIBS4LINK
@@ -31,6 +40,10 @@ set (LIBS4LINK
 
 if (BUILD_TESTS)
   add_subdirectory(test)
+endif()
+
+if(BUILD_TOOLS)
+  add_subdirectory(tools)
 endif()
 
 if(BUILD_MAIN)

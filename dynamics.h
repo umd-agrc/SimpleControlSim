@@ -1,6 +1,6 @@
 #pragma once
 
-#include <gsl/gsl_matrix.h>
+#include <mxnet-cpp/MxNetCpp.h>
 
 #include "defines.h"
 #include "matrix_vector_ops.h"
@@ -50,21 +50,19 @@
 //
 // Control vector:
 //    del_lat del_lon del_yaw del_thrust
-int dynamics(std::vector<mx_float> *dy,
-    mx_float t, const std::vector<mx_float> *y,
-    const std::vector<mx_float> *u);
+int dynamics(mxnet::cpp::NDArray *dy, mx_float t, mxnet::cpp::NDArray *y,
+    mxnet::cpp::NDArray *u);
 int setupDynamics();
-int teardownDynamics();
 
-std::vector<mx_float> *feedback(const std::vector<mx_float> *yd,
-    const std::vector<mx_float> *y,
-    std::vector<mx_float> *baseAction,
-    std::vector<mx_float> *meanAction);
+mxnet::cpp::NDArray *feedback(mxnet::cpp::NDArray &yd,
+    mxnet::cpp::NDArray &y,
+    mxnet::cpp::NDArray *baseAction,
+    mxnet::cpp::NDArray *meanAction);
 int setupFeedback();
-int teardownFeedback();
 
-std::vector<mx_float> *policyFeedback(const std::vector<mx_float> *yd,
-    const std::vector<mx_float> *y,
-    std::vector<mx_float> *baseCtl);
+mxnet::cpp::NDArray *policyFeedback(mxnet::cpp::NDArray &yd,
+    mxnet::cpp::NDArray &y,
+    mxnet::cpp::NDArray *baseAction,
+    mxnet::cpp::NDArray *meanAction);
 int setupPolicyFeedback(Controller *controller, PolicyFunction *policyFunction);
 PolicyFunction * getFeedbackPolicy();

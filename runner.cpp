@@ -6,45 +6,35 @@ void testFeedbackControl(bool *shouldExit,
     char *dataFilename, PolicyFunction &policy,
     std::deque<char*> *sendQueue, VehicleState *vehicle, Controller *controller,
     int numSteps) {
-	std::vector<mx_float> observations,
-                        actions,
-	                      observationsAndActions,
-                        baseActions,
-                        nextBaseAction,
-                        meanActions,
-                        nextMeanAction;
-  std::vector<mx_float> y_next, rk_e_next;
-  std::vector<mx_float> *u;
+	NDArray observations = NDArray(Shape(numSteps,2*NUM_STATES),Context::cpu(),false),
+          actions = NDArray(Shape(numSteps,NUM_INPUTS),Context::cpu(),false),
+          observationsAndActions =
+            NDArray(Shape(numSteps,2*NUM_STATES+NUM_INPUTS),Context::cpu(),false),
+          baseActions = NDArray(Shape(numSteps,NUM_INPUTS),Context::cpu(),false),
+          nextBaseAction,
+          meanActions = NDArray(Shape(numSteps,NUM_INPUTS),Context::cpu(),false),
+          nextMeanAction;
+  NDArray y_next, rk_e_next;
+  NDArray *u;
   char sendBuff[1025];
   mx_float stepSize;
-  //double t[4200]; int numSteps = 4200;
   mx_float t[numSteps];
   t[0] = 0;
 	FILE *dataFile = NULL;
+  size_t currObservationsSz = 2*NUM_STATES,
+         currObservationsAndActionsSz = 2*NUM_STATES+NUM_INPUTS;
+  log("Testing feedback control");
 
-	if (dataFilename) {
-		dataFile = fopen(dataFilename,"w");
-
-		logHeader(dataFile,"t,xd,yd,zd,ud,vd,wd,pd,qd,rd,phid,thetad,psid,x,y,z,u,v,w,p,q,r,phi,theta,psi,del_lat,del_lon,del_yaw,del_thrust\n");
-		logTime(dataFile,t[0],",","a");
-		logVector(dataFile,&vehicle->yd,",","a",true);
-		logVector(dataFile,&vehicle->y,",","a",true);
-		logVector(dataFile,controller->feedback(&vehicle->yd,&vehicle->y,NULL,NULL),",","n",false);
-	}
-
-  u = controller->feedback(&vehicle->yd,&vehicle->y,&nextBaseAction,&nextMeanAction);
-  /*
-  auto currObservations = vector_stack(&vehicle->yd,&vehicle->y);
-  observations.insert(
-      observations.end(),currObservations.begin(),currObservations.end());
-  actions.insert(actions.end(),u->begin(),u->end());
-  auto tmp = vector_stack(&currObservations,u);
-  observationsAndActions.insert(observationsAndActions.end(),tmp.begin(),tmp.end());
-  baseActions.insert(baseActions.end(),nextBaseAction.begin(),nextBaseAction.end());
-  meanActions.insert(meanActions.end(),nextMeanAction.begin(),nextMeanAction.end());
+  u = controller->feedback(vehicle->yd,vehicle->y,&nextBaseAction,&nextMeanAction);
+  auto currObservations = Concat(vehicle->yd,vehicle->y,Shape(1,currObservationsSz));
+  observations.SetData(0,0,currObservations);
+  actions.SetData(0,0,*u);
+  auto currObservationsAndActions =
+    Concat(currObservations,*u,Shape(1,currObservationsAndActionsSz));
+  baseActions.SetData(0,0,nextBaseAction);
+  meanActions.SetData(0,0,nextMeanAction);
 
   int i=1;
-
   bool reset = true;
   while (!*shouldExit && i < numSteps) {
     rungeKutteAdaptiveStep(&dynamics,
@@ -61,58 +51,41 @@ void testFeedbackControl(bool *shouldExit,
     t[i] = t[i-1] + stepSize;
 
     vehicle->y = y_next;
-    u = controller->feedback(&vehicle->yd,&vehicle->y,&nextBaseAction,&nextMeanAction);
-    auto currObservations = vector_stack(&vehicle->yd,&vehicle->y);
-    observations.insert(
-        observations.end(),currObservations.begin(),currObservations.end());
-    actions.insert(actions.end(),u->begin(),u->end());
-    auto tmp = vector_stack(&currObservations,u);
-    observationsAndActions.insert(observationsAndActions.end(),tmp.begin(),tmp.end());
-    baseActions.insert(baseActions.end(),nextBaseAction.begin(),nextBaseAction.end());
-    meanActions.insert(meanActions.end(),nextMeanAction.begin(),nextMeanAction.end());
+    u = controller->feedback(vehicle->yd,vehicle->y,&nextBaseAction,&nextMeanAction);
+    currObservations = Concat(vehicle->yd,vehicle->y,Shape(1,currObservationsSz));
+    observations.SetData(i,0,currObservations);
+    actions.SetData(i,0,*u);
+    currObservationsAndActions =
+      Concat(currObservations,*u,Shape(1,currObservationsAndActionsSz));
+    baseActions.SetData(i,0,nextBaseAction);
+    meanActions.SetData(i,0,nextMeanAction);
 
-		if (dataFilename) {
-			logTime(dataFile,t[i],",","a");
-			logVector(dataFile,&vehicle->yd,",","a",true);
-			logVector(dataFile,&vehicle->y,",","a",true);
-			logVector(dataFile,u,",","n",false);
-		}
-
+    /*
     if (formNextMsg(sendBuff) == SIM_SUCCESS)
       sendQueue->push_back(sendBuff);
     //usleep(15000);
+    */
 
     i++;
   }
-  */
 
-  /*
   // Set array map for policy update
-  policy.trajSegment["observation"] =
-    NDArray(observations,Shape(numSteps,2*NUM_STATES),Context::cpu());
-  policy.trajSegment["action"] =
-    NDArray(actions,Shape(numSteps,NUM_INPUTS),Context::cpu());
-  policy.trajSegment["observationAndAction"] =
-    NDArray(observationsAndActions,Shape(numSteps,2*NUM_STATES + NUM_INPUTS),Context::cpu());
-  policy.trajSegment["mean"] =
-    NDArray(meanActions,Shape(numSteps,NUM_INPUTS),Context::cpu());
-  policy.baseActions =
-    NDArray(baseActions,Shape(numSteps,NUM_INPUTS),Context::cpu());
+  policy.baseActions = baseActions;
+  policy.trajSegment["observation"] = observations;
+  policy.trajSegment["action"] = actions - baseActions;
+  policy.trajSegment["observationAndAction"] = observationsAndActions;
+  policy.trajSegment["meanCtl"] = meanActions;
   policy.trajSegment["std"] = policy.getStd(Shape(numSteps,NUM_INPUTS));
-  policy.trajSegment["logstd"] = log(policy.trajSegment["std"]);
 
-  policy.policyArgs["observation"].CopyTo(&policy.oldPolicyArgs["observation"]);
+  policy.oldPolicyArgs["policyx"] = observations;
+  policy.rebindOldPolicy();
   policy.oldPolicyExec->Forward(false);
-  policy.oldTrajSegment["mean"] =
-    policy.oldPolicyExec->outputs[0] + policy.baseActions;
-  policy.oldTrajSegment["std"] = policy.getStd(Shape(numSteps,NUM_INPUTS));
-  policy.oldTrajSegment["logstd"] = log(policy.oldTrajSegment["std"]);
-  policy.oldTrajSegment["action"] =
-    policy.oldTrajSegment["mean"]
-    + policy.oldTrajSegment["std"]*policy.getRand(Shape(numSteps,NUM_INPUTS));
+  policy.trajSegment["oldMeanCtl"] = policy.oldPolicyExec->outputs[0];
+  policy.trajSegment["oldStd"] = policy.getStd(Shape(numSteps,NUM_INPUTS));
+  policy.trajSegment["oldAction"] = policy.trajSegment["oldMeanCtl"]
+    + policy.trajSegment["oldStd"]*policy.getRand(Shape(numSteps,NUM_INPUTS));
 
 	if (dataFilename) fclose(dataFile);
-  */
 }
 
 int formNextMsg(char *msg) {

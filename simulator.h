@@ -19,12 +19,9 @@
 void *simulate(void *var);
 
 int resetSystem(VehicleState *vehicle, Controller *controller);
-int setupSystem(VehicleState *vehicle, Controller *controller, int dataShape[2], int type);
-int setupSystem(VehicleState *vehicle, Controller *controller,
-    char *policyNetFile, char *valueNetFile, int type);
-int teardownSystem(VehicleState *vehicle, Controller *controller, int type);
+int setupSystem(VehicleState *vehicle, Controller *controller);
+int setupSystem(VehicleState *vehicle, Controller *controller, PolicyFunction *policy);
 
-void testPolicyFeedbackControl(bool *shouldExit, char *policyNetFile,
-    char *valueNetFile, char *trainingDataFile,
+void testPolicyFeedbackControl(bool *shouldExit,
 		std::deque<char*> *sendQueue, PolicyFunction &policy,
     VehicleState *vehicle, Controller *controller);

@@ -30,6 +30,8 @@
 #include <random>
 #include <mxnet-cpp/MxNetCpp.h>
 
+#include "defines.h"
+
 inline bool isFileExists(const std::string &filename) {
   std::ifstream fhandle(filename.c_str());
   return fhandle.good();
@@ -152,5 +154,91 @@ inline mxnet::cpp::NDArray mean(mxnet::cpp::NDArray x) {
   mxnet::cpp::Operator("mean")(x).Invoke(ret);
   return ret;
 }
+
+inline mxnet::cpp::NDArray dot(mxnet::cpp::NDArray x1, mxnet::cpp::NDArray x2) {
+  mxnet::cpp::NDArray ret;
+  mxnet::cpp::Operator("dot")(x1,x2).Invoke(ret);
+  return ret;
+}
+
+inline mxnet::cpp::NDArray max(mxnet::cpp::NDArray x) {
+  mxnet::cpp::NDArray ret;
+  mxnet::cpp::Operator("max")(x).Invoke(ret);
+  return ret;
+}
+
+inline mxnet::cpp::NDArray Concat(
+    const std::vector<mxnet::cpp::NDArray> &arrayVec,
+    mxnet::cpp::Shape s) {
+  mxnet::cpp::NDArray ret;
+  std::vector<mx_float> v(s.Size());
+  size_t idx = 0;
+  for (auto arr : arrayVec) {
+    memcpy(&v[idx], arr.GetData(), arr.Size()*sizeof(mx_float));
+    idx += arr.Size();
+  }
+
+  ret = mxnet::cpp::NDArray(v,s,mxnet::cpp::Context::cpu());
+
+  return ret;
+}
+
+inline mxnet::cpp::NDArray Concat(const mxnet::cpp::NDArray &a1,
+                                  const mxnet::cpp::NDArray &a2,
+                                  mxnet::cpp::Shape s) {
+  mxnet::cpp::NDArray ret;
+
+  std::vector<mx_float> v(s.Size());
+  memcpy(&v[0], a1.GetData(), a1.Size()*sizeof(mx_float));
+  memcpy(&v[a1.Size()], a2.GetData(), a2.Size()*sizeof(mx_float));
+  ret = mxnet::cpp::NDArray(v,s,mxnet::cpp::Context::cpu());
+
+  return ret;
+}
+
+inline mxnet::cpp::NDArray zeros(mxnet::cpp::Shape s) {
+  mxnet::cpp::NDArray ret;
+  std::vector<mx_float> v(s.Size(),0.0);
+  ret = mxnet::cpp::NDArray(v,s,mxnet::cpp::Context::cpu());
+  return ret;
+}
+
+inline mxnet::cpp::NDArray ones(mxnet::cpp::Shape s) {
+  mxnet::cpp::NDArray ret;
+  std::vector<mx_float> v(s.Size(),1.0);
+  ret = mxnet::cpp::NDArray(v,s,mxnet::cpp::Context::cpu());
+  return ret;
+}
+
+template<typename Function, typename... Args>
+inline int testFunction(std::string testname, Function f, Args... args) {
+  std::cout << "TEST: " << testname << std::endl << std::endl;
+
+  f(args...);
+
+  std::cout << std::endl << "------------------" << std::endl;
+  std::cout << std::endl;
+
+  mxnet::cpp::NDArray::WaitAll();
+  return TEST_SUCCESS;
+}
+
+// Forward execution over rows of inArr
+void vecExecForward(
+    mxnet::cpp::Executor *exec, 
+    mxnet::cpp::Symbol &sym,
+    std::map<std::string,mxnet::cpp::NDArray> &inMap,
+    std::string arrName,
+    const std::vector<mxnet::cpp::NDArray> &inVec,
+    std::vector<mxnet::cpp::NDArray> &outVec);
+
+void vecExecForwardBackward(
+    mxnet::cpp::Executor *exec, 
+    mxnet::cpp::Symbol &sym,
+    std::map<std::string,mxnet::cpp::NDArray> &inMap,
+    std::vector<mxnet::cpp::NDArray> &labelVec,
+    std::string arrName,
+    const std::vector<mxnet::cpp::NDArray> &inVec,
+    std::vector<mxnet::cpp::NDArray> &outVec);
 
 #endif // NN_CONTROL_UTILS_H_
