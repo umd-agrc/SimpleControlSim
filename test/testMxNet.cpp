@@ -37,15 +37,16 @@ int main(int argc, char **argv) {
   /*
   testGrad();
   testNetUpdate();
-  */
   testFunction("Net reshape",&testNetReshape);
-  /*
+
   testNDArrayBasics();
   testSimpleArithmetic();
   testNDArrayReduce();
   testExp();
   testNDArrayAssign();
+  */
   testNDArrayConcat();
+  /*
   testNDArrayInit();
   testNDArrayMax();
   testNDArrayCopy();

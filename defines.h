@@ -25,10 +25,12 @@ extern "C" {
 
 #define LQR_TYPE 0
 #define POLICY_TYPE 1
-#define CAMILA_TYPE 2
+#define TRAIN_TYPE 2
 
 #define NUM_STATES 12
 #define NUM_INPUTS 4
+
+#define MXNET_ZERO_TOL 0.0e-9f
 
 struct VehicleState {
   mxnet::cpp::NDArray yd,y;

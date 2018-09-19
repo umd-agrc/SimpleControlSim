@@ -25,3 +25,7 @@ int setupSystem(VehicleState *vehicle, Controller *controller, PolicyFunction *p
 void testPolicyFeedbackControl(bool *shouldExit,
 		std::deque<char*> *sendQueue, PolicyFunction &policy,
     VehicleState *vehicle, Controller *controller);
+
+void trainPolicyFeedbackControl(bool *shouldExit,
+		std::deque<char*> *sendQueue, PolicyFunction &policy,
+    VehicleState *vehicle, Controller *controller);

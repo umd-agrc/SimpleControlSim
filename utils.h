@@ -122,55 +122,68 @@ inline void copyNDArrayMap(std::map<std::string, mxnet::cpp::NDArray> &dst,
 inline mxnet::cpp::NDArray square(mxnet::cpp::NDArray x) {
   mxnet::cpp::NDArray ret;
   mxnet::cpp::Operator("square")(x).Invoke(ret);
+  mxnet::cpp::NDArray::WaitAll();
   return ret;
 }
 
 inline mxnet::cpp::NDArray sum(mxnet::cpp::NDArray x, size_t axis = 0) {
   mxnet::cpp::NDArray ret;
   mxnet::cpp::Operator("sum")(x,axis).Invoke(ret);
+  mxnet::cpp::NDArray::WaitAll();
   return ret;
 }
 
 inline mxnet::cpp::NDArray negative(mxnet::cpp::NDArray x) {
   mxnet::cpp::NDArray ret;
   mxnet::cpp::Operator("negative")(x).Invoke(ret);
+  mxnet::cpp::NDArray::WaitAll();
   return ret;
 }
 
 inline mxnet::cpp::NDArray log(mxnet::cpp::NDArray x) {
   mxnet::cpp::NDArray ret;
   mxnet::cpp::Operator("log")(x).Invoke(ret);
+  mxnet::cpp::NDArray::WaitAll();
   return ret;
 }
 
 inline mxnet::cpp::NDArray exp(mxnet::cpp::NDArray x) {
   mxnet::cpp::NDArray ret;
   mxnet::cpp::Operator("exp")(x).Invoke(ret);
+  mxnet::cpp::NDArray::WaitAll();
   return ret;
 }
 
 inline mxnet::cpp::NDArray mean(mxnet::cpp::NDArray x) {
   mxnet::cpp::NDArray ret;
   mxnet::cpp::Operator("mean")(x).Invoke(ret);
+  mxnet::cpp::NDArray::WaitAll();
   return ret;
 }
 
 inline mxnet::cpp::NDArray dot(mxnet::cpp::NDArray x1, mxnet::cpp::NDArray x2) {
   mxnet::cpp::NDArray ret;
   mxnet::cpp::Operator("dot")(x1,x2).Invoke(ret);
+  mxnet::cpp::NDArray::WaitAll();
   return ret;
 }
 
 inline mxnet::cpp::NDArray max(mxnet::cpp::NDArray x) {
   mxnet::cpp::NDArray ret;
   mxnet::cpp::Operator("max")(x).Invoke(ret);
+  mxnet::cpp::NDArray::WaitAll();
+  return ret;
+}
+
+inline mxnet::cpp::NDArray abs(mxnet::cpp::NDArray x) {
+  mxnet::cpp::NDArray ret;
+  mxnet::cpp::Operator("abs")(x).Invoke(ret);
   return ret;
 }
 
 inline mxnet::cpp::NDArray Concat(
     const std::vector<mxnet::cpp::NDArray> &arrayVec,
     mxnet::cpp::Shape s) {
-  mxnet::cpp::NDArray ret;
   std::vector<mx_float> v(s.Size());
   size_t idx = 0;
   for (auto arr : arrayVec) {
@@ -178,7 +191,7 @@ inline mxnet::cpp::NDArray Concat(
     idx += arr.Size();
   }
 
-  ret = mxnet::cpp::NDArray(v,s,mxnet::cpp::Context::cpu());
+  mxnet::cpp::NDArray ret = mxnet::cpp::NDArray(v,s,mxnet::cpp::Context::cpu());
 
   return ret;
 }
@@ -186,12 +199,10 @@ inline mxnet::cpp::NDArray Concat(
 inline mxnet::cpp::NDArray Concat(const mxnet::cpp::NDArray &a1,
                                   const mxnet::cpp::NDArray &a2,
                                   mxnet::cpp::Shape s) {
-  mxnet::cpp::NDArray ret;
-
   std::vector<mx_float> v(s.Size());
   memcpy(&v[0], a1.GetData(), a1.Size()*sizeof(mx_float));
   memcpy(&v[a1.Size()], a2.GetData(), a2.Size()*sizeof(mx_float));
-  ret = mxnet::cpp::NDArray(v,s,mxnet::cpp::Context::cpu());
+  mxnet::cpp::NDArray ret = mxnet::cpp::NDArray(v,s,mxnet::cpp::Context::cpu());
 
   return ret;
 }

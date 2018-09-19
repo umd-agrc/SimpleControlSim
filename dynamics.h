@@ -58,7 +58,7 @@ mxnet::cpp::NDArray *feedback(mxnet::cpp::NDArray &yd,
     mxnet::cpp::NDArray &y,
     mxnet::cpp::NDArray *baseAction,
     mxnet::cpp::NDArray *meanAction);
-int setupFeedback();
+int setupFeedback(Controller *controller);
 
 mxnet::cpp::NDArray *policyFeedback(mxnet::cpp::NDArray &yd,
     mxnet::cpp::NDArray &y,

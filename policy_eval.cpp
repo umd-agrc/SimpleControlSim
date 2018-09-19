@@ -12,7 +12,7 @@ void policyUpdate(bool *shouldExit,
 		std::deque<char*> *sendQueue, PolicyFunction &policy,
     VehicleState *vehicle, Controller *controller, int horizon) {
   log("Running policy update");
-  testFeedbackControl(shouldExit,NULL,policy,sendQueue,vehicle,controller,horizon);
+  testFeedbackControl(shouldExit,NULL,&policy,NULL,sendQueue,vehicle,controller,horizon);
   getAdvantage(policy);
   getObjectiveAndGradient(policy);
 

@@ -11,21 +11,23 @@ void *simulate(void *var) {
   // Initialize vehicle and controller
   VehicleState *vehicle = new VehicleState;
   Controller *controller = new Controller;
-  //int sysType = NN_TYPE;
-  //int sysType = LQR_TYPE;
   //TODO systype as command line argument
+  //int sysType = LQR_TYPE;
   int sysType = POLICY_TYPE;
+  //int sysType = TRAIN_TYPE;
   if (sysType == LQR_TYPE) {
     setupSystem(vehicle,controller);
 
-    char dataFilename[1024];
-    strcpy(dataFilename,"./data/lqrCtl");
-    strcat(dataFilename,".csv");
-    //TODO fix this
-    //testFeedbackControl(&shouldExit,dataFilename,sendQueue,vehicle,controller,1000);
+    log("Testing LQR feedback");
+    std::map<std::string,NDArray> trajectory;
+    NDArray::WaitAll();
+    testFeedbackControl(&shouldExit,NULL,NULL,&trajectory,sendQueue,vehicle,controller,500);
+    logNDArrayMap("data/lqr/arr/",
+                  ".ndarray",
+                  trajectory);
 
-    strcpy(sendBuff,SHUTDOWN_MESSAGE);
-    sendQueue->push_back(sendBuff);
+    //strcpy(sendBuff,SHUTDOWN_MESSAGE);
+    //sendQueue->push_back(sendBuff);
   } else if (sysType == POLICY_TYPE) {	
     log("Creating policy gradient simulation");
 
@@ -39,14 +41,20 @@ void *simulate(void *var) {
       setupSystem(vehicle,controller,&policy);
     }
     
-		srand(time(NULL));
 		testPolicyFeedbackControl(&shouldExit,sendQueue,policy,vehicle,controller);
     /*
     strcpy(sendBuff,SHUTDOWN_MESSAGE);
     sendQueue->push_back(sendBuff);
     */
     MXNotifyShutdown();
-	}
+	} else if (sysType == TRAIN_TYPE) {	
+    log("Training policy gradient");
+
+    PolicyFunction policy;
+		trainPolicyFeedbackControl(&shouldExit,sendQueue,policy,vehicle,controller);
+
+    MXNotifyShutdown();
+  }
 
   log("Test done!!");
 
@@ -61,6 +69,7 @@ int resetSystem(VehicleState *vehicle, Controller *controller) {
   //    x y z u v w p q r phi theta psi
   vehicle->yd = zeros(Shape(NUM_STATES,1));
   vehicle->y = ones(Shape(NUM_STATES,1));
+  NDArray::WaitAll();
   return SIM_SUCCESS;
 }
 
@@ -69,9 +78,9 @@ int setupSystem(VehicleState *vehicle, Controller *controller) {
   // Set initial and desired state vector
   //    x y z u v w p q r phi theta psi
   resetSystem(vehicle,controller);
+  NDArray::WaitAll();
   setupDynamics();
-  controller->feedback = feedback;
-  setupFeedback();
+  setupFeedback(controller);
  
   return SIM_SUCCESS;
 }
@@ -81,6 +90,7 @@ int setupSystem(VehicleState *vehicle, Controller *controller, PolicyFunction *p
   // Set initial and desired state vector
   //    x y z u v w p q r phi theta psi
   resetSystem(vehicle,controller);
+  NDArray::WaitAll();
   setupDynamics();
   setupPolicyFeedback(controller, policy);
 
@@ -90,8 +100,7 @@ int setupSystem(VehicleState *vehicle, Controller *controller, PolicyFunction *p
 void testPolicyFeedbackControl(bool *shouldExit,
 		std::deque<char*> *sendQueue, PolicyFunction &policy,
     VehicleState *vehicle, Controller *controller) {
-	int numEpoch = 9;
-
+	int numEpoch = 5;
   setupLoss(policy);
 
   int epoch = 0;
@@ -99,16 +108,27 @@ void testPolicyFeedbackControl(bool *shouldExit,
 
   //TODO save network configuration after each epoch
   while (!*shouldExit && epoch < numEpoch) {
+    resetSystem(vehicle,controller);
     log("Performing LQR-PPO test epoch ", epoch, ""); 
     // Update controller policy
     policyUpdate(shouldExit, sendQueue, policy, vehicle, controller, numSteps);
-    if (epoch % 3 == 0) {
+    if (epoch % 80 == 0) {
       log("Logging trajectory of epoch ", epoch); fflush(stdout);
       logNDArrayMap("data/policy/arr/",
                     "-epoch" + std::to_string(epoch) + ".ndarray",
                     policy.trajSegment);
-    }
+      NDArray::Save(
+          "data/policy/train/trajSegment-epoch" + std::to_string(epoch) + ".ndbin",
+          policy.trajSegment);
 
+      NDArray::Save(
+          "data/policy/train/policyNet-epoch" + std::to_string(epoch) + ".ndbin",
+          policy.policyExec->arg_dict());
+
+      NDArray::Save(
+          "data/policy/train/valueNet-epoch" + std::to_string(epoch) + ".ndbin",
+          policy.valueExec->arg_dict());
+    }
 		epoch++;
 	}
 
@@ -118,13 +138,23 @@ void testPolicyFeedbackControl(bool *shouldExit,
     policy.executionTimes[vec.first] =
       NDArray(vec.second,Shape(vec.second.size(),1),Context::cpu());
   }
-  //NDArray::Save("data/policy/" + policy.executionTimesString,
-  //              policy.executionTimes);
 
   logNDArrayMap("data/policy/dbg/execution_times/",
                 ".ndarray",
                 policy.executionTimes);
 #endif
+
+  NDArray::Save(
+      "data/policy/train/trajSegment-recent.ndbin",
+      policy.trajSegment);
+
+  NDArray::Save(
+      "data/policy/train/policyNet-recent.ndbin",
+      policy.policyExec->arg_dict());
+
+  NDArray::Save(
+      "data/policy/train/valueNet-recent.ndbin",
+      policy.valueExec->arg_dict());
 
   log("Finished LQR-PPO control test");
 
@@ -132,3 +162,30 @@ void testPolicyFeedbackControl(bool *shouldExit,
 }
 
 
+void trainPolicyFeedbackControl(bool *shouldExit,
+		std::deque<char*> *sendQueue, PolicyFunction &policy,
+    VehicleState *vehicle, Controller *controller) {
+	int numEpoch = 10;
+
+  policy.trajSegment = NDArray::LoadToMap("data/policy/train/trajSegment-recent.ndbin");
+
+  auto policyArgs = NDArray::LoadToMap("data/policy/train/policyNet-recent.ndbin");
+  auto valueArgs = NDArray::LoadToMap("data/policy/train/valueNet-recent.ndbin");
+
+  for (auto a : policyArgs) {
+    std::cout << a.first << "\n" << a.second << std::endl;
+  }
+  policy.policyExec = policy.policyNet.SimpleBind(Context::cpu(),policyArgs); 
+  policy.valueExec = policy.valueNet.SimpleBind(Context::cpu(),valueArgs); 
+
+  setupLoss(policy);
+
+  int epoch = 0;
+
+  while (!*shouldExit && epoch < numEpoch) {
+    log("Performing LQR-PPO train epoch ", epoch, ""); 
+    epoch++;
+  }
+
+  NDArray::WaitAll();
+}

@@ -56,6 +56,7 @@ int setupDynamics() {
   dyn = NDArray(dynVec,
                 Shape(NUM_STATES,NUM_STATES+NUM_INPUTS),
                 Context::cpu());
+  NDArray::WaitAll();
 
   return SIM_SUCCESS;
 }
@@ -67,14 +68,25 @@ int setupDynamics() {
 int dynamics(NDArray *dy, mx_float t, NDArray *y,
     NDArray *u) {
   (void) (t); // Avoid unused parameter warning
-  dyn.SetData(0,3,cos(y->At(11,0)));
-  dyn.SetData(0,4,-sin(y->At(11,0)));
-  dyn.SetData(1,3,sin(y->At(11,0)));
-  dyn.SetData(1,4,cos(y->At(11,0)));
+  /*
+  NDArray::WaitAll();
+  mx_float th = y->GetData()[11];
+  //std::cout << "y " << *y << std::endl;
+  dyn.SetData(0,3,cos(th));
+  dyn.SetData(0,4,-sin(th));
+  dyn.SetData(1,3,sin(th));
+  dyn.SetData(1,4,cos(th));
+  */
+  //std::cout << "u " << *u << std::endl;
+  NDArray::WaitAll();
 
   NDArray yu = Concat(*y,*u, Shape(NUM_INPUTS+NUM_STATES,1));
 
+  //std::cout << "yu " << yu << std::endl;
+  NDArray::WaitAll();
   *dy = dot(dyn,yu);
+  //std::cout << "dy " << *dy << std::endl;
+  NDArray::WaitAll();
 
   return SIM_SUCCESS;
 }
@@ -83,24 +95,33 @@ NDArray *feedback(NDArray &yd,
     NDArray &y,
     NDArray *baseAction,
     NDArray *meanAction) {
+  NDArray::WaitAll();
   NDArray e = yd - y;
+  NDArray::WaitAll();
   fb = dot(gains, e);
+  NDArray::WaitAll();
   if (baseAction) *baseAction = fb;
   meanAction = NULL;
 
+  NDArray::WaitAll();
   return &fb;
 }
 
-int setupFeedback() {
+int setupFeedback(Controller *controller) {
+  log("Setting up LQR feedback");
   std::vector<mx_float> kVec = {
    0.0020, 1.0000, -0.0000, -0.0418, 1.3856, -0.0000, 1.1039, 0.0001, -0.0000, 4.6346, 0.0395, -0.0000,
    -1.0000, 0.0020, -0.0043, -1.3583, -0.0458, -0.0015, 0.0004, 1.1348, -0.0028, -0.0247, 4.6926, -0.0028,
    -0.0035, 0.0000, 0.1773, -0.0070, -0.0001, -0.0188, -0.0000, -0.0010, 1.0131, -0.0002, -0.0142, 0.9842,
    0.0037, -0.0000, -0.9842, 0.0147, 0.0001, -0.9920, 0.0000, 0.0044, 0.2049, 0.0001, 0.2483, 0.1773
   };
-  gains = NDArray(kVec, Shape(NUM_INPUTS, NUM_STATES), Context::cpu());
 
-  log("Set up LQR feedback");
+  gains = NDArray(kVec, Shape(NUM_INPUTS, NUM_STATES), Context::cpu());
+  NDArray::WaitAll();
+
+  controller->feedback = feedback;
+  NDArray::WaitAll();
+
   return SIM_SUCCESS;
 }
 
@@ -110,15 +131,20 @@ NDArray *policyFeedback(NDArray &yd,
     NDArray *baseAction,
     NDArray *meanAction) {
   NDArray e = yd - y;
+  NDArray::WaitAll();
   fb = dot(gains, e);
+  NDArray::WaitAll();
 
   if (baseAction != NULL) *baseAction = fb.Copy(Context::cpu());
+  NDArray::WaitAll();
 
   policy->policyArgs["policyx"] = Concat(yd,y,Shape(1,2*NUM_STATES));
+  NDArray::WaitAll();
 #ifdef DEBUG
   t1 = high_resolution_clock::now();
 #endif
   policy->policyExec->Forward(false);
+  NDArray::WaitAll();
 #ifdef DEBUG
   t2 = high_resolution_clock::now();
   policy->executionTimesVec["policySingleForwardPass"].push_back(
@@ -126,6 +152,7 @@ NDArray *policyFeedback(NDArray &yd,
 #endif
   if (meanAction != NULL) *meanAction = policy->policyExec->outputs[0]; 
   fb += policy->sample();
+  NDArray::WaitAll();
   return &fb;
 }
 
@@ -138,9 +165,11 @@ int setupPolicyFeedback(Controller *controller, PolicyFunction *policyFunction) 
    0.0037, -0.0000, -0.9842, 0.0147, 0.0001, -0.9920, 0.0000, 0.0044, 0.2049, 0.0001, 0.2483, 0.1773
   };
   gains = NDArray(kVec, Shape(NUM_INPUTS, NUM_STATES), Context::cpu());
+  NDArray::WaitAll();
 
   policy = policyFunction;
   controller->feedback = policyFeedback;
+  NDArray::WaitAll();
 
   return SIM_SUCCESS;
 }

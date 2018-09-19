@@ -6,7 +6,8 @@
 #include "diff.h"
 
 void testFeedbackControl(bool *shouldExit,
-    char *dataFilename, PolicyFunction &policy,
+    char *dataFilename, PolicyFunction *policy,
+    std::map<std::string,mxnet::cpp::NDArray> *trajectory,
     std::deque<char*> *sendQueue, VehicleState *vehicle, Controller *controller,
     int numSteps);
 

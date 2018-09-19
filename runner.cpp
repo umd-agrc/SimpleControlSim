@@ -2,8 +2,10 @@
 
 using namespace mxnet::cpp;
 
+//TODO step-by-step debug for lqr
 void testFeedbackControl(bool *shouldExit,
-    char *dataFilename, PolicyFunction &policy,
+    char *dataFilename, PolicyFunction *policy,
+    std::map<std::string,NDArray> *trajectory,
     std::deque<char*> *sendQueue, VehicleState *vehicle, Controller *controller,
     int numSteps) {
 	NDArray observations = NDArray(Shape(numSteps,2*NUM_STATES),Context::cpu(),false),
@@ -25,14 +27,24 @@ void testFeedbackControl(bool *shouldExit,
          currObservationsAndActionsSz = 2*NUM_STATES+NUM_INPUTS;
   log("Testing feedback control");
 
-  u = controller->feedback(vehicle->yd,vehicle->y,&nextBaseAction,&nextMeanAction);
+  if (policy) {
+    u = controller->feedback(vehicle->yd,vehicle->y,&nextBaseAction,&nextMeanAction);
+    baseActions.SetData(0,0,nextBaseAction);
+    meanActions.SetData(0,0,nextMeanAction);
+  } else {
+    u = controller->feedback(vehicle->yd,vehicle->y,NULL,NULL);
+  }
   auto currObservations = Concat(vehicle->yd,vehicle->y,Shape(1,currObservationsSz));
   observations.SetData(0,0,currObservations);
   actions.SetData(0,0,*u);
   auto currObservationsAndActions =
     Concat(currObservations,*u,Shape(1,currObservationsAndActionsSz));
-  baseActions.SetData(0,0,nextBaseAction);
-  meanActions.SetData(0,0,nextMeanAction);
+
+#ifdef DEBUG
+  std::cout << "desired state: " << vehicle->yd << std::endl
+            << "state: " << vehicle->y << std::endl
+            << "controls: " << *u << std::endl;
+#endif
 
   int i=1;
   bool reset = true;
@@ -46,19 +58,38 @@ void testFeedbackControl(bool *shouldExit,
                            &stepSize,
                            -1,
                            reset);
+    NDArray::WaitAll();
     reset = false;
 
     t[i] = t[i-1] + stepSize;
+    std::cout << "t[" << i << "]: " << t[i] << std::endl;
 
-    vehicle->y = y_next;
-    u = controller->feedback(vehicle->yd,vehicle->y,&nextBaseAction,&nextMeanAction);
+    y_next.CopyTo(&vehicle->y);
+    NDArray::WaitAll();
+    if (policy) {
+      u = controller->feedback(vehicle->yd,vehicle->y,&nextBaseAction,&nextMeanAction);
+      NDArray::WaitAll();
+      baseActions.SetData(i,0,nextBaseAction);
+      meanActions.SetData(i,0,nextMeanAction);
+    } else {
+      u = controller->feedback(vehicle->yd,vehicle->y,NULL,NULL);
+    }
+    NDArray::WaitAll();
     currObservations = Concat(vehicle->yd,vehicle->y,Shape(1,currObservationsSz));
+    NDArray::WaitAll();
     observations.SetData(i,0,currObservations);
+    NDArray::WaitAll();
     actions.SetData(i,0,*u);
+    NDArray::WaitAll();
     currObservationsAndActions =
       Concat(currObservations,*u,Shape(1,currObservationsAndActionsSz));
-    baseActions.SetData(i,0,nextBaseAction);
-    meanActions.SetData(i,0,nextMeanAction);
+    NDArray::WaitAll();
+
+#ifdef DEBUG
+  std::cout << "desired state: " << vehicle->yd << std::endl
+            << "state: " << vehicle->y << std::endl
+            << "controls: " << *u << std::endl;
+#endif
 
     /*
     if (formNextMsg(sendBuff) == SIM_SUCCESS)
@@ -69,21 +100,26 @@ void testFeedbackControl(bool *shouldExit,
     i++;
   }
 
-  // Set array map for policy update
-  policy.baseActions = baseActions;
-  policy.trajSegment["observation"] = observations;
-  policy.trajSegment["action"] = actions - baseActions;
-  policy.trajSegment["observationAndAction"] = observationsAndActions;
-  policy.trajSegment["meanCtl"] = meanActions;
-  policy.trajSegment["std"] = policy.getStd(Shape(numSteps,NUM_INPUTS));
+  if (policy) {
+    // Set array map for policy update
+    policy->baseActions = baseActions;
+    policy->trajSegment["observation"] = observations;
+    policy->trajSegment["action"] = actions - baseActions;
+    policy->trajSegment["observationAndAction"] = observationsAndActions;
+    policy->trajSegment["meanCtl"] = meanActions;
+    policy->trajSegment["std"] = policy->getStd(Shape(numSteps,NUM_INPUTS));
 
-  policy.oldPolicyArgs["policyx"] = observations;
-  policy.rebindOldPolicy();
-  policy.oldPolicyExec->Forward(false);
-  policy.trajSegment["oldMeanCtl"] = policy.oldPolicyExec->outputs[0];
-  policy.trajSegment["oldStd"] = policy.getStd(Shape(numSteps,NUM_INPUTS));
-  policy.trajSegment["oldAction"] = policy.trajSegment["oldMeanCtl"]
-    + policy.trajSegment["oldStd"]*policy.getRand(Shape(numSteps,NUM_INPUTS));
+    policy->oldPolicyArgs["policyx"] = observations;
+    policy->rebindOldPolicy();
+    policy->oldPolicyExec->Forward(false);
+    policy->trajSegment["oldMeanCtl"] = policy->oldPolicyExec->outputs[0];
+    policy->trajSegment["oldStd"] = policy->getStd(Shape(numSteps,NUM_INPUTS));
+    policy->trajSegment["oldAction"] = policy->trajSegment["oldMeanCtl"]
+      + policy->trajSegment["oldStd"]*policy->getRand(Shape(numSteps,NUM_INPUTS));
+  } else {
+    (*trajectory)["observation"] = observations;
+    (*trajectory)["action"] = actions;
+  }
 
 	if (dataFilename) fclose(dataFile);
 }
