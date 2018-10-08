@@ -102,10 +102,9 @@ inline mxnet::cpp::Symbol min(mxnet::cpp::Symbol lhs, mxnet::cpp::Symbol rhs) {
     + mxnet::cpp::broadcast_lesser(rhs,lhs)*rhs;
 }
 
-void setRandomDistributionParams(
-    std::normal_distribution<> &d, std::mt19937 &g);
+void setupRandomDistribution();
 
-mxnet::cpp::NDArray randNormal(double mean, double std, mxnet::cpp::Shape shape);
+mxnet::cpp::NDArray randNormal(mxnet::cpp::NDArray mean, mxnet::cpp::NDArray std, int len);
 
 inline mx_float clip(mx_float a, mx_float low, mx_float high) {
   return fmax(fmin(a,high),low);
@@ -129,6 +128,13 @@ inline mxnet::cpp::NDArray square(mxnet::cpp::NDArray x) {
 inline mxnet::cpp::NDArray sum(mxnet::cpp::NDArray x, size_t axis = 0) {
   mxnet::cpp::NDArray ret;
   mxnet::cpp::Operator("sum")(x,axis).Invoke(ret);
+  mxnet::cpp::NDArray::WaitAll();
+  return ret;
+}
+
+inline mxnet::cpp::NDArray prod(mxnet::cpp::NDArray x, size_t axis = 0) {
+  mxnet::cpp::NDArray ret;
+  mxnet::cpp::Operator("prod")(x,axis).Invoke(ret);
   mxnet::cpp::NDArray::WaitAll();
   return ret;
 }
@@ -221,6 +227,23 @@ inline mxnet::cpp::NDArray ones(mxnet::cpp::Shape s) {
   return ret;
 }
 
+inline mxnet::cpp::NDArray neglogp(mxnet::cpp::NDArray action,
+                                mxnet::cpp::NDArray mean,
+                                mxnet::cpp::NDArray std) {
+  return (sum(square((action-mean)
+                     /std),1)*0.5
+          + 0.5*log(2*M_PI)*NUM_INPUTS
+          + sum(log(std),1)).Reshape(
+                mxnet::cpp::Shape(action.GetShape()[0],1));
+
+}
+
+inline mxnet::cpp::NDArray logp(mxnet::cpp::NDArray action,
+                                   mxnet::cpp::NDArray mean,
+                                   mxnet::cpp::NDArray std) {
+  return neglogp(action,mean,std)*-1;
+}
+
 template<typename Function, typename... Args>
 inline int testFunction(std::string testname, Function f, Args... args) {
   std::cout << "TEST: " << testname << std::endl << std::endl;
@@ -233,23 +256,5 @@ inline int testFunction(std::string testname, Function f, Args... args) {
   mxnet::cpp::NDArray::WaitAll();
   return TEST_SUCCESS;
 }
-
-// Forward execution over rows of inArr
-void vecExecForward(
-    mxnet::cpp::Executor *exec, 
-    mxnet::cpp::Symbol &sym,
-    std::map<std::string,mxnet::cpp::NDArray> &inMap,
-    std::string arrName,
-    const std::vector<mxnet::cpp::NDArray> &inVec,
-    std::vector<mxnet::cpp::NDArray> &outVec);
-
-void vecExecForwardBackward(
-    mxnet::cpp::Executor *exec, 
-    mxnet::cpp::Symbol &sym,
-    std::map<std::string,mxnet::cpp::NDArray> &inMap,
-    std::vector<mxnet::cpp::NDArray> &labelVec,
-    std::string arrName,
-    const std::vector<mxnet::cpp::NDArray> &inVec,
-    std::vector<mxnet::cpp::NDArray> &outVec);
 
 #endif // NN_CONTROL_UTILS_H_

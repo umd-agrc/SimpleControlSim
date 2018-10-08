@@ -10,6 +10,7 @@
 #include "test_defines.h"
 #include "policy.h"
 #include "policy_eval.h"
+#include "probability_distributions.h"
 
 int testGrad();
 int testNetUpdate();
@@ -18,6 +19,7 @@ int testNDArrayBasics();
 int testSimpleArithmetic();
 int testNDArrayReduce();
 int testExp();
+void testLogp();
 int testNDArrayAssign();
 int testNDArrayConcat();
 int testNDArrayInit();

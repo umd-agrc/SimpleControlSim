@@ -43,10 +43,11 @@ int main(int argc, char **argv) {
   testSimpleArithmetic();
   testNDArrayReduce();
   testExp();
-  testNDArrayAssign();
   */
-  testNDArrayConcat();
+  testFunction("Log probability", &testLogp);
   /*
+  testNDArrayAssign();
+  testNDArrayConcat();
   testNDArrayInit();
   testNDArrayMax();
   testNDArrayCopy();
@@ -318,6 +319,48 @@ int testExp() {
 
   NDArray::WaitAll();
   return TEST_SUCCESS;
+}
+
+void testLogp() {
+/*
+  auto action = NDArray({1,2,2,2,3,6,32,12,44,1,2,3,3,54,6,4},
+                        Shape(4,4),
+                        Context::cpu());
+  auto mean = NDArray({1.1,2.1,3,1.8,2.5,5,30,15,40,3,2.2,2.7,3.1,52,5.8,4.1},
+                      Shape(4,4),
+                      Context::cpu());
+  auto std = NDArray({0.1,0.1,0.2,0.1,0.2,1,3,4,8,3,2,1,0.2,1,0.3,0.4},
+                     Shape(4,4),
+                     Context::cpu());
+*/
+  auto action = NDArray({0.0771532, -0.0921249, 0.155535, 0.110629},
+                        Shape(1,4),
+                        Context::cpu());
+  auto mean = NDArray({-0.0125206, -0.019085, 0.0512585, -0.0105176},
+                      Shape(1,4),
+                      Context::cpu());
+  auto std = NDArray({0.1, 0.1, 0.1, 0.1},
+                     Shape(1,4),
+                     Context::cpu());
+
+  auto res = exp(logp(action,mean,std));
+
+  auto a = Symbol::Variable("action");
+  auto m = Symbol::Variable("mean");
+  auto s = Symbol::Variable("std");
+  auto ls = log(s);
+  auto p = DiagGaussianPd();
+  auto r = exp(p.logp(m,s,ls,a));
+  std::map<std::string,NDArray> arrMap;
+  arrMap["action"] = action;
+  arrMap["mean"] = mean;
+  arrMap["std"] = std;
+
+  auto exec = r.SimpleBind(Context::cpu(),arrMap);
+  exec->Forward(false);
+
+  std::cout << "ndarray prob dist: " << res << std::endl;
+  std::cout << "symbol prob dist: " << exec->outputs[0] << std::endl;
 }
 
 int testNDArrayAssign() {

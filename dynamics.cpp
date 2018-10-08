@@ -130,6 +130,7 @@ NDArray *policyFeedback(NDArray &yd,
     NDArray &y,
     NDArray *baseAction,
     NDArray *meanAction) {
+  static Shape fbShape(NUM_INPUTS,1);
   NDArray e = yd - y;
   NDArray::WaitAll();
   fb = dot(gains, e);
@@ -139,6 +140,7 @@ NDArray *policyFeedback(NDArray &yd,
   NDArray::WaitAll();
 
   policy->policyArgs["policyx"] = Concat(yd,y,Shape(1,2*NUM_STATES));
+  policy->rebindPolicy();
   NDArray::WaitAll();
 #ifdef DEBUG
   t1 = high_resolution_clock::now();
@@ -151,7 +153,11 @@ NDArray *policyFeedback(NDArray &yd,
       duration_cast<microseconds>(t2-t1).count());
 #endif
   if (meanAction != NULL) *meanAction = policy->policyExec->outputs[0]; 
-  fb += policy->sample();
+  auto tmp = policy->sample();
+  tmp = tmp.Reshape(fbShape);
+  //fb = fb + tmp;
+  fb = tmp;
+  //std::cout << "fb " << fb << std::endl;
   NDArray::WaitAll();
   return &fb;
 }

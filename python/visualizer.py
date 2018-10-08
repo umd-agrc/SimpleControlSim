@@ -27,8 +27,10 @@ p=None
 
 prefixPath={}
 prefixPath['executionTimes'] = os.path.join('..','data','policy','dbg','execution_times')
-prefixPath['ndarrays'] = os.path.join('..','data','policy','arr')
+prefixPath['ndarrays'] = os.path.join('..','data','policy','arr2')
 prefixPath['symbols'] = os.path.join('..','data','policy','sym')
+prefixPath['lqr_ndarrays'] = os.path.join('..','data','lqr','arr')
+prefixPath['ppo_ndarrays'] = os.path.join('..','data','policy','arr3')
 
 executionTimes={}
 ndarrays={}
@@ -76,126 +78,145 @@ if plotExecutionTimes:
 
 if plotArrays:
     OBSERVATION_LEN = 24
+
+    ndarrays['lqr_observation'] =parseNDArrayFile(
+        os.path.join(prefixPath['lqr_ndarrays'],'observation.ndarray'))
+    ndarrays['lqr_observation'] =\
+        np.reshape(ndarrays['lqr_observation'],
+                   (int(len(ndarrays['lqr_observation'])/OBSERVATION_LEN),
+                    OBSERVATION_LEN))
+    ndarrays['ppo_observation0'] =parseNDArrayFile(
+        os.path.join(prefixPath['ppo_ndarrays'],'observation-epoch0.ndarray'))
+    ndarrays['ppo_observation0'] =\
+        np.reshape(ndarrays['ppo_observation0'],
+                   (int(len(ndarrays['ppo_observation0'])/OBSERVATION_LEN),
+                    OBSERVATION_LEN))
+    ndarrays['ppo_observation10'] =parseNDArrayFile(
+        os.path.join(prefixPath['ppo_ndarrays'],'observation-epoch10.ndarray'))
+    ndarrays['ppo_observation10'] =\
+        np.reshape(ndarrays['ppo_observation10'],
+                   (int(len(ndarrays['ppo_observation10'])/OBSERVATION_LEN),
+                    OBSERVATION_LEN))
+    ndarrays['ppo_observation20'] =parseNDArrayFile(
+        os.path.join(prefixPath['ppo_ndarrays'],'observation-epoch20.ndarray'))
+    ndarrays['ppo_observation20'] =\
+        np.reshape(ndarrays['ppo_observation20'],
+                   (int(len(ndarrays['ppo_observation20'])/OBSERVATION_LEN),
+                    OBSERVATION_LEN))
+
+
+
     ndarrays['observation0'] = parseNDArrayFile(
         os.path.join(prefixPath['ndarrays'],'observation-epoch0.ndarray'))
     ndarrays['observation0'] =\
         np.reshape(ndarrays['observation0'],
                    (int(len(ndarrays['observation0'])/OBSERVATION_LEN),
                     OBSERVATION_LEN))
-    ndarrays['observation80'] = parseNDArrayFile(
-        os.path.join(prefixPath['ndarrays'],'observation-epoch80.ndarray'))
-    ndarrays['observation80'] =\
-        np.reshape(ndarrays['observation80'],
-                   (int(len(ndarrays['observation80'])/OBSERVATION_LEN),
+    ndarrays['observation2'] = parseNDArrayFile(
+        os.path.join(prefixPath['ndarrays'],'observation-epoch2.ndarray'))
+    ndarrays['observation2'] =\
+        np.reshape(ndarrays['observation2'],
+                   (int(len(ndarrays['observation2'])/OBSERVATION_LEN),
                     OBSERVATION_LEN))
-    ndarrays['observation160'] = parseNDArrayFile(
-        os.path.join(prefixPath['ndarrays'],'observation-epoch160.ndarray'))
-    ndarrays['observation160'] =\
-        np.reshape(ndarrays['observation160'],
-                   (int(len(ndarrays['observation160'])/OBSERVATION_LEN),
+    ndarrays['observation4'] = parseNDArrayFile(
+        os.path.join(prefixPath['ndarrays'],'observation-epoch4.ndarray'))
+    ndarrays['observation4'] =\
+        np.reshape(ndarrays['observation4'],
+                   (int(len(ndarrays['observation4'])/OBSERVATION_LEN),
                     OBSERVATION_LEN))
-    ndarrays['observation240'] = parseNDArrayFile(
-        os.path.join(prefixPath['ndarrays'],'observation-epoch240.ndarray'))
-    ndarrays['observation240'] =\
-        np.reshape(ndarrays['observation240'],
-                   (int(len(ndarrays['observation240'])/OBSERVATION_LEN),
+    ndarrays['observation6'] = parseNDArrayFile(
+        os.path.join(prefixPath['ndarrays'],'observation-epoch6.ndarray'))
+    ndarrays['observation6'] =\
+        np.reshape(ndarrays['observation6'],
+                   (int(len(ndarrays['observation6'])/OBSERVATION_LEN),
                     OBSERVATION_LEN))
-    ndarrays['observation320'] = parseNDArrayFile(
-        os.path.join(prefixPath['ndarrays'],'observation-epoch320.ndarray'))
-    ndarrays['observation320'] =\
-        np.reshape(ndarrays['observation320'],
-                   (int(len(ndarrays['observation320'])/OBSERVATION_LEN),
+    '''
+    ndarrays['observation8'] = parseNDArrayFile(
+        os.path.join(prefixPath['ndarrays'],'observation-epoch8.ndarray'))
+    ndarrays['observation8'] =\
+        np.reshape(ndarrays['observation8'],
+                   (int(len(ndarrays['observation8'])/OBSERVATION_LEN),
                     OBSERVATION_LEN))
-    ndarrays['observation400'] = parseNDArrayFile(
-        os.path.join(prefixPath['ndarrays'],'observation-epoch400.ndarray'))
-    ndarrays['observation400'] =\
-        np.reshape(ndarrays['observation400'],
-                   (int(len(ndarrays['observation400'])/OBSERVATION_LEN),
+    ndarrays['observation10'] = parseNDArrayFile(
+        os.path.join(prefixPath['ndarrays'],'observation-epoch10.ndarray'))
+    ndarrays['observation10'] =\
+        np.reshape(ndarrays['observation10'],
+                   (int(len(ndarrays['observation10'])/OBSERVATION_LEN),
                     OBSERVATION_LEN))
-    ndarrays['observation480'] = parseNDArrayFile(
-        os.path.join(prefixPath['ndarrays'],'observation-epoch480.ndarray'))
-    ndarrays['observation480'] =\
-        np.reshape(ndarrays['observation480'],
-                   (int(len(ndarrays['observation480'])/OBSERVATION_LEN),
+    ndarrays['observation12'] = parseNDArrayFile(
+        os.path.join(prefixPath['ndarrays'],'observation-epoch12.ndarray'))
+    ndarrays['observation12'] =\
+        np.reshape(ndarrays['observation12'],
+                   (int(len(ndarrays['observation12'])/OBSERVATION_LEN),
                     OBSERVATION_LEN))
-    ndarrays['observation560'] = parseNDArrayFile(
-        os.path.join(prefixPath['ndarrays'],'observation-epoch560.ndarray'))
-    ndarrays['observation560'] =\
-        np.reshape(ndarrays['observation560'],
-                   (int(len(ndarrays['observation560'])/OBSERVATION_LEN),
+    ndarrays['observation14'] = parseNDArrayFile(
+        os.path.join(prefixPath['ndarrays'],'observation-epoch14.ndarray'))
+    ndarrays['observation14'] =\
+        np.reshape(ndarrays['observation14'],
+                   (int(len(ndarrays['observation14'])/OBSERVATION_LEN),
                     OBSERVATION_LEN))
-    ndarrays['observation640'] = parseNDArrayFile(
-        os.path.join(prefixPath['ndarrays'],'observation-epoch640.ndarray'))
-    ndarrays['observation640'] =\
-        np.reshape(ndarrays['observation640'],
-                   (int(len(ndarrays['observation640'])/OBSERVATION_LEN),
+    ndarrays['observation16'] = parseNDArrayFile(
+        os.path.join(prefixPath['ndarrays'],'observation-epoch16.ndarray'))
+    ndarrays['observation16'] =\
+        np.reshape(ndarrays['observation16'],
+                   (int(len(ndarrays['observation16'])/OBSERVATION_LEN),
                     OBSERVATION_LEN))
-    ndarrays['observation720'] = parseNDArrayFile(
-        os.path.join(prefixPath['ndarrays'],'observation-epoch720.ndarray'))
-    ndarrays['observation720'] =\
-        np.reshape(ndarrays['observation720'],
-                   (int(len(ndarrays['observation720'])/OBSERVATION_LEN),
+    ndarrays['observation18'] = parseNDArrayFile(
+        os.path.join(prefixPath['ndarrays'],'observation-epoch18.ndarray'))
+    ndarrays['observation18'] =\
+        np.reshape(ndarrays['observation18'],
+                   (int(len(ndarrays['observation18'])/OBSERVATION_LEN),
                     OBSERVATION_LEN))
-    ndarrays['observation800'] = parseNDArrayFile(
-        os.path.join(prefixPath['ndarrays'],'observation-epoch800.ndarray'))
-    ndarrays['observation800'] =\
-        np.reshape(ndarrays['observation800'],
-                   (int(len(ndarrays['observation800'])/OBSERVATION_LEN),
+    ndarrays['observation20'] = parseNDArrayFile(
+        os.path.join(prefixPath['ndarrays'],'observation-epoch20.ndarray'))
+    ndarrays['observation20'] =\
+        np.reshape(ndarrays['observation20'],
+                   (int(len(ndarrays['observation20'])/OBSERVATION_LEN),
                     OBSERVATION_LEN))
-    ndarrays['observation880'] = parseNDArrayFile(
-        os.path.join(prefixPath['ndarrays'],'observation-epoch880.ndarray'))
-    ndarrays['observation880'] =\
-        np.reshape(ndarrays['observation880'],
-                   (int(len(ndarrays['observation880'])/OBSERVATION_LEN),
+    ndarrays['observation22'] = parseNDArrayFile(
+        os.path.join(prefixPath['ndarrays'],'observation-epoch22.ndarray'))
+    ndarrays['observation22'] =\
+        np.reshape(ndarrays['observation22'],
+                   (int(len(ndarrays['observation22'])/OBSERVATION_LEN),
                     OBSERVATION_LEN))
-    ndarrays['observation960'] = parseNDArrayFile(
-        os.path.join(prefixPath['ndarrays'],'observation-epoch960.ndarray'))
-    ndarrays['observation960'] =\
-        np.reshape(ndarrays['observation960'],
-                   (int(len(ndarrays['observation960'])/OBSERVATION_LEN),
+    ndarrays['observation24'] = parseNDArrayFile(
+        os.path.join(prefixPath['ndarrays'],'observation-epoch24.ndarray'))
+    ndarrays['observation24'] =\
+        np.reshape(ndarrays['observation24'],
+                   (int(len(ndarrays['observation24'])/OBSERVATION_LEN),
                     OBSERVATION_LEN))
+    '''
 
     ndarrays['epoch'] = np.array(range(len(ndarrays['observation0'])))/12.5
+    ndarrays['lqr_epoch'] = np.array(range(len(ndarrays['lqr_observation'])))/12.5
+    ndarrays['ppo_epoch'] = np.array(range(len(ndarrays['ppo_observation0'])))/12.5
 
-    p = plt.figure(title="Vehicle x position", tools=PLT_TOOLS)
+    p = plt.figure(title="Vehicle x velocity", tools=PLT_TOOLS)
     p.title.text_font_size = '20pt'
     p.legend.label_text_font_size = '15pt'
+    p.legend.location = 'bottom_right'
     p.xaxis.axis_label = 'Time [s]'
     p.xaxis.axis_label_text_font_size = '15pt'
     p.xaxis.major_label_text_font_size = '12pt'
     p.yaxis.axis_label = 'Position [m]'
     p.yaxis.axis_label_text_font_size = '15pt'
     p.yaxis.major_label_text_font_size = '12pt'
-    p.scatter(ndarrays['epoch'],ndarrays['observation0'][:,12],
-            color = '#e65c5c', legend = 'update 0')
-    '''
-    p.scatter(ndarrays['epoch'],nplin.norm(ndarrays['observation80'][:,12:]),
-            color = '#e6935c', legend = 'observation 80')
-    p.scatter(ndarrays['epoch'],nplin.norm(ndarrays['observation160'][:,12:]),
-            color = '#e6d15c', legend = 'observation 160')
-    p.scatter(ndarrays['epoch'],nplin.norm(ndarrays['observation240'][:,12:]),
-            color = '#bfe65c', legend = 'observation 240')
-    p.scatter(ndarrays['epoch'],nplin.norm(ndarrays['observation320'][:,12:]),
-            color = '#88e65c', legend = 'observation 320')
-    p.scatter(ndarrays['epoch'],nplin.norm(ndarrays['observation400'][:,12:]),
-            color = '#5ce67f', legend = 'observation 400')
-    p.scatter(ndarrays['epoch'],nplin.norm(ndarrays['observation480'][:,12:]),
-            color = '#5ce6d1', legend = 'observation 480')
-    '''
-    p.scatter(ndarrays['epoch'],ndarrays['observation560'][:,12],
-            color = '#5cb3e6', legend = 'update 560')
-    '''
-    p.scatter(ndarrays['epoch'],nplin.norm(ndarrays['observation640'][:,12:]),
-            color = '#5c78e6', legend = 'observation 640')
-    p.scatter(ndarrays['epoch'],nplin.norm(ndarrays['observation720'][:,12:]),
-            color = '#785ce6', legend = 'observation 720')
-    p.scatter(ndarrays['epoch'],nplin.norm(ndarrays['observation800'][:,12:]),
-            color = '#c15ce6', legend = 'observation 800')
-    p.scatter(ndarrays['epoch'],nplin.norm(ndarrays['observation880'][:,12:]),
-            color = '#e65cca', legend = 'observation 880')
-            '''
-    p.scatter(ndarrays['epoch'],ndarrays['observation960'][:,12],
-            color = '#e65c9c', legend = 'update 960')
+
+    p.square(ndarrays['lqr_epoch'][0:100],ndarrays['lqr_observation'][0:100,18],
+            color = '#000000', legend = 'lqr')
+    p.triangle(ndarrays['ppo_epoch'],ndarrays['ppo_observation0'][:,18],
+            color = '#320000', legend = 'ppo update 0')
+    p.triangle(ndarrays['ppo_epoch'],ndarrays['ppo_observation10'][:,18],
+            color = '#228b22', legend = 'ppo update 100')
+    p.triangle(ndarrays['ppo_epoch'],ndarrays['ppo_observation20'][:,18],
+            color = '#323200', legend = 'ppo update 300')
+
+    p.scatter(ndarrays['epoch'],ndarrays['observation0'][:,18],
+            color = '#fa3232', legend = 'aug update 0')
+    p.scatter(ndarrays['epoch'],ndarrays['observation2'][:,18],
+            color = '#3296fa', legend = 'aug update 100')
+    p.scatter(ndarrays['epoch'],ndarrays['observation6'][:,18],
+            color = '#329664', legend = 'aug update 300')
     plt.show(p)
 
 if plotSymbols:

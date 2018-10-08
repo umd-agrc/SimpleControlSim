@@ -3,32 +3,19 @@
 using namespace mxnet::cpp;
 
 static Context ctx = Context::cpu();
+static std::mt19937 gen;
+static std::normal_distribution<> d{0,1};
 
-void vecExecForward(
-    mxnet::cpp::Executor *exec, 
-    mxnet::cpp::Symbol &sym,
-    std::map<std::string,mxnet::cpp::NDArray> &inMap,
-    std::string arrName,
-    const std::vector<mxnet::cpp::NDArray> &inVec,
-    std::vector<mxnet::cpp::NDArray> &outVec) {
-//net.InferArgsMap(ctx, &netArgs, netArgs);
-  for (auto arr : inVec) {
-    inMap[arrName] = arr;
-    sym.InferArgsMap(ctx,&inMap,inMap);
-    exec = sym.SimpleBind(ctx, inMap);
-    exec->Forward(false);
-    outVec.push_back(exec->outputs[0]);
-    std::cout << "input: " << arr << " gettin outputs: " << exec->outputs[0] << std::endl;
-  }
+void setupRandomDistribution() {
+  std::random_device rd;
+  gen = std::mt19937(rd());
 }
 
-void vecExecForwardBackward(
-    mxnet::cpp::Executor *exec, 
-    mxnet::cpp::Symbol &sym,
-    std::map<std::string,mxnet::cpp::NDArray> &inMap,
-    std::vector<mxnet::cpp::NDArray> &labelVec,
-    std::string arrName,
-    const std::vector<mxnet::cpp::NDArray> &inVec,
-    std::vector<mxnet::cpp::NDArray> &outVec) {
-
+NDArray randNormal(NDArray mean, NDArray std, int len) {
+  std::vector<mx_float> vec(len);
+  for (int i=0; i < len; i++) {
+    d.param(std::normal_distribution<>::param_type(mean.At(0,i),std.At(0,i)));
+    vec[i] = d(gen);
+  }
+  return NDArray(vec, Shape(1,len), ctx);
 }

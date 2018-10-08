@@ -19,7 +19,7 @@ void policyUpdate(bool *shouldExit,
  */
 void getAdvantage(
     PolicyFunction &policy,
-    mx_float horizonDecay = 0.9, mx_float genAdvantageDecay = 0.9);
+    mx_float horizonDecay = 0.99, mx_float genAdvantageDecay = 0.95);
 
 void getReward(PolicyFunction &policy);
 

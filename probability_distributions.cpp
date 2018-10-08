@@ -5,6 +5,7 @@ using namespace mxnet::cpp;
 DiagGaussianPd::DiagGaussianPd() {
 }
 
+//FIXME
 NDArray DiagGaussianPd::neglogp(
     std::map<std::string,NDArray> &trajSegment) {
   return (sum(square((trajSegment["action"]-trajSegment["mean"])
@@ -40,12 +41,20 @@ Symbol DiagGaussianPd::neglogp(Symbol &meanCtl,
                Symbol &std,
                Symbol &logstd,
                Symbol &action) {
-  auto a = sum(square((action-meanCtl)/std),
-               dmlc::optional<Shape>(Shape(1)))*0.5
-           + 0.5*log(2*M_PI)*NUM_INPUTS;
-  auto b = sum(logstd,dmlc::optional<Shape>(Shape(1)));
+
+  /*
+  return (sum(square((action-mean)
+                     /std),1)*0.5
+          + 0.5*log(2*M_PI)*NUM_INPUTS
+          + sum(log(std),1)).Reshape(
+                mxnet::cpp::Shape(action.GetShape()[0],1));
+
+
+          */
+  auto a = sum(square(action-meanCtl)/square(std), dmlc::optional<Shape>(Shape(1)))*0.5;
+  auto b = log(sqrt(prod(std, dmlc::optional<Shape>(Shape(1))))) + 0.5*log(2*M_PI)*NUM_INPUTS; 
   auto c = reshape_like(a,b);
-  return c + b;
+  return c+b;
 }
 
 Symbol DiagGaussianPd::logp(Symbol &meanCtl,

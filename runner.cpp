@@ -41,9 +41,11 @@ void testFeedbackControl(bool *shouldExit,
     Concat(currObservations,*u,Shape(1,currObservationsAndActionsSz));
 
 #ifdef DEBUG
+  /*
   std::cout << "desired state: " << vehicle->yd << std::endl
             << "state: " << vehicle->y << std::endl
             << "controls: " << *u << std::endl;
+            */
 #endif
 
   int i=1;
@@ -62,7 +64,7 @@ void testFeedbackControl(bool *shouldExit,
     reset = false;
 
     t[i] = t[i-1] + stepSize;
-    std::cout << "t[" << i << "]: " << t[i] << std::endl;
+    //std::cout << "t[" << i << "]: " << t[i] << std::endl;
 
     y_next.CopyTo(&vehicle->y);
     NDArray::WaitAll();
@@ -86,9 +88,11 @@ void testFeedbackControl(bool *shouldExit,
     NDArray::WaitAll();
 
 #ifdef DEBUG
+  /*
   std::cout << "desired state: " << vehicle->yd << std::endl
             << "state: " << vehicle->y << std::endl
             << "controls: " << *u << std::endl;
+            */
 #endif
 
     /*
@@ -110,7 +114,9 @@ void testFeedbackControl(bool *shouldExit,
     policy->trajSegment["std"] = policy->getStd(Shape(numSteps,NUM_INPUTS));
 
     policy->oldPolicyArgs["policyx"] = observations;
+    NDArray::WaitAll();
     policy->rebindOldPolicy();
+    NDArray::WaitAll();
     policy->oldPolicyExec->Forward(false);
     policy->trajSegment["oldMeanCtl"] = policy->oldPolicyExec->outputs[0];
     policy->trajSegment["oldStd"] = policy->getStd(Shape(numSteps,NUM_INPUTS));

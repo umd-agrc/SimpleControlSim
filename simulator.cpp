@@ -8,6 +8,8 @@ void *simulate(void *var) {
   char sendBuff[1025];
   int dataShape[2];
 
+  setupRandomDistribution();
+
   // Initialize vehicle and controller
   VehicleState *vehicle = new VehicleState;
   Controller *controller = new Controller;
@@ -100,11 +102,11 @@ int setupSystem(VehicleState *vehicle, Controller *controller, PolicyFunction *p
 void testPolicyFeedbackControl(bool *shouldExit,
 		std::deque<char*> *sendQueue, PolicyFunction &policy,
     VehicleState *vehicle, Controller *controller) {
-	int numEpoch = 5;
+	int numEpoch = 50;
   setupLoss(policy);
 
   int epoch = 0;
-  int numSteps = 10;
+  int numSteps = 100;
 
   //TODO save network configuration after each epoch
   while (!*shouldExit && epoch < numEpoch) {
@@ -112,7 +114,7 @@ void testPolicyFeedbackControl(bool *shouldExit,
     log("Performing LQR-PPO test epoch ", epoch, ""); 
     // Update controller policy
     policyUpdate(shouldExit, sendQueue, policy, vehicle, controller, numSteps);
-    if (epoch % 80 == 0) {
+    if (epoch % 2 == 0) {
       log("Logging trajectory of epoch ", epoch); fflush(stdout);
       logNDArrayMap("data/policy/arr/",
                     "-epoch" + std::to_string(epoch) + ".ndarray",

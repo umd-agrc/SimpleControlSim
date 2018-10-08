@@ -76,39 +76,67 @@ std::vector<NDArray> PolicyFunction::act(NDArray observations) {
 void PolicyFunction::update(std::vector<NDArray> policyGradients,
     std::vector<NDArray> valueGradients) {
 
+  /*
+  std::cout << "policy gradients" << std::endl;
+  for (auto e : policyGradients) {
+    std::cout << e << std::endl;
+  }
+  */
+
   // Keep copy of old policy
-  oldPolicyExec->arg_arrays = policyExec->arg_arrays;
-
-  auto policyArgNames = policyNet.ListArguments();
-  for (size_t i = 0; i < policyArgNames.size(); ++i) {
-    if (policyArgNames[i] == "policyx" || policyArgNames[i] == "policyy") continue;
-    policyOpt->Update(i, policyExec->arg_arrays[i], policyGradients[i]);
+  // TODO copy arg arrays, not assignment
+  for (int i=0; i < policyExec->arg_arrays.size(); i++) {
+    oldPolicyExec->arg_arrays[i] = policyExec->arg_arrays[i].Copy(Context::cpu());
+    NDArray::WaitAll();
   }
 
-  auto valueArgNames = valueNet.ListArguments();
-  for (size_t i = 0; i < valueArgNames.size(); ++i) {
-    if (valueArgNames[i] == "valuex" || valueArgNames[i] == "valuey") continue;
-    valueOpt->Update(i, valueExec->arg_arrays[i], valueGradients[i]);
+  //TODO update multiple times a la experience replay
+  for (int epoch = 0; epoch < 50; epoch++) {
+    auto policyArgNames = policyNet.ListArguments();
+    for (size_t i = 0; i < policyArgNames.size(); ++i) {
+      if (policyArgNames[i] == "policyx" || policyArgNames[i] == "policyy") continue;
+      policyOpt->Update(i, policyExec->arg_arrays[i], policyGradients[i]);
+      NDArray::WaitAll();
+    }
+
+    auto valueArgNames = valueNet.ListArguments();
+    for (size_t i = 0; i < valueArgNames.size(); ++i) {
+      if (valueArgNames[i] == "valuex" || valueArgNames[i] == "valuey") continue;
+      valueOpt->Update(i, valueExec->arg_arrays[i], valueGradients[i]);
+      NDArray::WaitAll();
+    }
   }
+
+  /*
+  for (int i=0; i < policyExec->arg_arrays.size(); i++) {
+    std::cout << "mean diff " 
+              << mean(oldPolicyExec->arg_arrays[i] - policyExec->arg_arrays[i])
+              << std::endl;
+  }
+  */
 }
 
 NDArray PolicyFunction::getRand(Shape shape) {
   NDArray ret = NDArray(shape,Context::cpu(),true);
   NDArray::SampleGaussian(0,1,&ret);
+  NDArray::WaitAll();
   return ret;
 }
 
 NDArray PolicyFunction::getStd(Shape shape) {
   NDArray ret = NDArray(shape,Context::cpu(),true);
   ret = stdDefaultValue;
+  NDArray::WaitAll();
   return ret;
 }
 
 NDArray PolicyFunction::sample() {
-  std::map<std::string,NDArray> policy_dict = policyExec->arg_dict();
-  return policy_dict["policyy"] + getStd(Shape(1,NUM_INPUTS));
+  return randNormal(policyExec->outputs[0],getStd(Shape(1,NUM_INPUTS)),NUM_INPUTS);
 }
 
+//TODO something more like this
+//    data_batch.data.CopyTo(&args["X"]);
+//    data_batch.label.CopyTo(&args["label"]);
 void PolicyFunction::rebindPolicy() {
   policyNet.InferArgsMap(Context::cpu(),&policyArgs,policyArgs);
   policyExec = policyNet.SimpleBind(Context::cpu(),policyArgs);
